@@ -87,10 +87,19 @@ export async function createConnection({
 
     if (choice === "1") {
       useCode = true;
-      phone = await question(
+      let rawPhone = await question(
         "  Digita el número de teléfono (ej: 521XXXXXXXXXX): "
       );
-      phone = phone.replace(/[^0-9]/g, "");
+
+      // Normalización igual que Isagi (fix prefijo mexicano +521 → +52)
+      rawPhone = rawPhone.replace(/\D/g, "");
+      if (!rawPhone.startsWith("+")) rawPhone = `+${rawPhone}`;
+      if (rawPhone.startsWith("+521")) {
+        rawPhone = rawPhone.replace("+521", "+52");
+      } else if (rawPhone.startsWith("+52") && rawPhone[4] === "1") {
+        rawPhone = rawPhone.replace("+52 1", "+52");
+      }
+      phone = rawPhone.replace(/\D/g, "");
     }
   }
 
@@ -105,13 +114,15 @@ export async function createConnection({
       },
       printQRInTerminal: !useCode,
       logger: pino({ level: "silent" }),
-      browser: ["Yuta Okotsu", "Chrome", "1.0.0"],
+      browser: ["MacOs", "Safari"],
       syncFullHistory: false,
-      markOnlineOnConnect: true,
-      generateHighQualityLinkPreview: false,
+      markOnlineOnConnect: false,
+      generateHighQualityLinkPreview: true,
+      getMessage: async () => undefined,
       connectTimeoutMs: 30000,
-      keepAliveIntervalMs: 15000,
+      keepAliveIntervalMs: 55000,
       retryRequestDelayMs: 2000,
+      defaultQueryTimeoutMs: undefined,
     });
   } catch (e) {
     log.error(`[${botLabel}] Error al crear socket: ${e.message}`);
@@ -121,7 +132,7 @@ export async function createConnection({
     return;
   }
 
-  // ─── PEDIR CÓDIGO (lógica estilo Isagi) ───────────────
+  // ─── PEDIR CÓDIGO (estilo Isagi) ──────────────────────
   if (useCode && !state.creds.registered) {
     await new Promise((r) => setTimeout(r, 3000));
     try {
@@ -192,7 +203,7 @@ export async function createConnection({
 
   sock.ev.on("creds.update", saveCreds);
 
-  // ─── MANEJADOR DE MENSAJES (lógica estilo Isagi) ──────
+  // ─── MANEJADOR DE MENSAJES ────────────────────────────
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify") return;
     for (const msg of messages) {
