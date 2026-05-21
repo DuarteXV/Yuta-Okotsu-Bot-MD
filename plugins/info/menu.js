@@ -1,5 +1,3 @@
-import { proto, generateWAMessageFromContent } from "@whiskeysockets/baileys";
-
 export default {
   name: ["menu", "help", "ayuda"],
   description: "Muestra el menú estético con link preview",
@@ -13,7 +11,10 @@ export default {
       const fecha = new Date().toLocaleDateString("es-CO");
       const lugar = isGroup ? groupName : "Chat Privado";
 
-      let textoMenu = `✨ ═══ 🫧 *YUTA OKOTSU* 🫧 ═══ ✨\n`;
+      const urlFoto = "https://raw.githubusercontent.com/DuarteXV/Yotsuba-MD-Premium/main/uploads/81af45f44481e159.jpg";
+
+      let textoMenu = `${urlFoto}\n\n`;
+      textoMenu += `✨ ═══ 🫧 *YUTA OKOTSU* 🫧 ═══ ✨\n`;
       textoMenu += `⚔️ _¡El Hechicero de Grado Especial ha despertado!_\n\n`;
 
       textoMenu += `╔════ 🪐 *INFO DEL SISTEMA* 🪐 ════╗\n`;
@@ -39,31 +40,10 @@ export default {
 
       textoMenu += `🔺 _Powered by DuarteXV | Yuta Okotsu MD_ 🔺`;
 
-      const urlFoto = "https://raw.githubusercontent.com/DuarteXV/Yotsuba-MD-Premium/main/uploads/81af45f44481e159.jpg";
-
-      const waMsg = generateWAMessageFromContent(
-        from,
-        {
-          extendedTextMessage: proto.Message.ExtendedTextMessage.fromObject({
-            text: textoMenu,
-            canonicalUrl: urlFoto,
-            matchedText: urlFoto,
-            jpegThumbnail: null,
-            thumbnailWidth: 400,
-            thumbnailHeight: 180,
-            previewType: 0,
-            title: "⚔️ Yuta Okotsu System",
-            description: "El Hechicero de Grado Especial",
-            renderLargerThumbnail: true,
-          })
-        },
-        {
-          userJid: sock.user?.id,
-          quoted: msg
-        }
-      );
-
-      await sock.relayMessage(from, waMsg.message, { messageId: waMsg.key.id });
+      await sock.sendMessage(from, {
+        text: textoMenu,
+        mentions: [`${senderNum}@s.whatsapp.net`]
+      }, { quoted: msg });
 
     } catch (error) {
       console.error("Error en menu:", error);
