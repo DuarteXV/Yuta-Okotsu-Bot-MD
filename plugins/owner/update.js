@@ -13,6 +13,11 @@ export default {
       execSync("git fetch --all");
       execSync("git reset --hard origin/main");
       const stdout = execSync("git pull origin main").toString();
+
+      if (stdout.includes("Already up to date") || stdout.includes("Ya está al día")) {
+        await react("✅");
+        return await reply({ text: "✅ *Ya está todo actualizado.*" });
+      }
       
       await loadPlugins();
 
