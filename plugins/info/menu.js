@@ -2,7 +2,7 @@ import { getPlugins } from "../../core/pluginLoader.js";
 
 export default {
   name: ["menu", "help", "ayuda"],
-  description: "Muestra el menú estético de comandos con vista previa de enlace",
+  description: "Muestra el menú estético de comandos con vista previa de enlace obligatoria",
   ownerOnly: false,
 
   async run({ sock, from, senderNum, isGroup, groupName, usedPrefix, react }) {
@@ -15,9 +15,7 @@ export default {
 
       const urlFoto = "https://raw.githubusercontent.com/DuarteXV/Yotsuba-MD-Premium/main/uploads/81af45f44481e159.jpg";
 
-      // El enlace debe ir al inicio o final del texto para que WhatsApp genere el link preview nativo
-      let textoMenu = `${urlFoto}\n\n`;
-      textoMenu += `✨ ═══ 🫧 *YUTA OKOTSU* 🫧 ═══ ✨\n`;
+      let textoMenu = `✨ ═══ 🫧 *YUTA OKOTSU* 🫧 ═══ ✨\n`;
       textoMenu += `⚔️ _¡El Hechicero de Grado Especial ha despertado!_\n\n`;
       
       textoMenu += `╔════ 🪐 *INFO DEL SISTEMA* 🪐 ════╗\n`;
@@ -43,18 +41,23 @@ export default {
 
       textoMenu += `🔺 _Powered by DuarteXV | Yuta Okotsu MD_ 🔺`;
 
-      // Se envía como mensaje de texto plano forzando la generación de la vista previa
+      // Enviamos el mensaje forzando a Baileys a generar el Link Preview nativo de WhatsApp
       await sock.sendMessage(from, {
         text: textoMenu,
         mentions: [`${senderNum}@s.whatsapp.net`],
-      }, { 
-        linkPreview: { 
-          "render-larger-thumbnail": true 
-        } 
+      }, {
+        linkPreview: {
+          title: "🫧 YUTA OKOTSU MD 🫧",
+          body: "Hechicero de Grado Especial",
+          mediaType: 1, // Tipo 1 especifica que es una imagen/enlace web
+          thumbnailUrl: urlFoto,
+          sourceUrl: urlFoto,
+          "render-larger-thumbnail": true // Esto obliga a WhatsApp a hacer la previsualización grande arriba del texto
+        }
       });
       
     } catch (error) {
-      console.error("Error en el comando menu con linkPreview nativo:", error);
+      console.error("Error en el comando menu con linkPreview forzado:", error);
     }
   }
 };
