@@ -2,7 +2,7 @@ import { getPlugins } from "../../core/pluginLoader.js";
 
 export default {
   name: ["menu", "help", "ayuda"],
-  description: "Muestra el menú estético de comandos",
+  description: "Muestra el menú estético de comandos con vista previa de enlace",
   ownerOnly: false,
 
   async run({ sock, from, senderNum, isGroup, groupName, usedPrefix, react }) {
@@ -15,7 +15,9 @@ export default {
 
       const urlFoto = "https://raw.githubusercontent.com/DuarteXV/Yotsuba-MD-Premium/main/uploads/81af45f44481e159.jpg";
 
-      let textoMenu = `✨ ═══ 🫧 *YUTA OKOTSU* 🫧 ═══ ✨\n`;
+      // El enlace debe ir al inicio o final del texto para que WhatsApp genere el link preview nativo
+      let textoMenu = `${urlFoto}\n\n`;
+      textoMenu += `✨ ═══ 🫧 *YUTA OKOTSU* 🫧 ═══ ✨\n`;
       textoMenu += `⚔️ _¡El Hechicero de Grado Especial ha despertado!_\n\n`;
       
       textoMenu += `╔════ 🪐 *INFO DEL SISTEMA* 🪐 ════╗\n`;
@@ -41,26 +43,18 @@ export default {
 
       textoMenu += `🔺 _Powered by DuarteXV | Yuta Okotsu MD_ 🔺`;
 
+      // Se envía como mensaje de texto plano forzando la generación de la vista previa
       await sock.sendMessage(from, {
-        image: { url: urlFoto },
-        caption: textoMenu,
+        text: textoMenu,
         mentions: [`${senderNum}@s.whatsapp.net`],
-        contextInfo: {
-          forwardingScore: 1,
-          isForwarded: true,
-          externalAdReply: {
-            title: "🔮 YUTA OKOTSU - SYSTEM OVERLOAD 🔮",
-            body: "Powered by DuarteXV",
-            mediaType: 1,
-            renderLargerThumbnail: false,
-            thumbnailUrl: urlFoto,
-            sourceUrl: "https://github.com/DuarteXV"
-          }
-        }
+      }, { 
+        linkPreview: { 
+          "render-larger-thumbnail": true 
+        } 
       });
       
     } catch (error) {
-      console.error("Error en el comando menu con linkPreview:", error);
+      console.error("Error en el comando menu con linkPreview nativo:", error);
     }
   }
 };
