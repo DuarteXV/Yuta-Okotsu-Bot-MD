@@ -1,4 +1,4 @@
-import { getAllPlugins } from "../core/pluginLoader.js";
+import { getPlugins } from "../core/pluginLoader.js";
 import config from "../config.js";
 
 export default {
@@ -9,7 +9,7 @@ export default {
   async run({ reply, react, sender, isGroup, groupName }) {
     await react("⚔️");
 
-    const plugins = getAllPlugins();
+    const plugins = getPlugins();
     const categories = {};
 
     for (const [, plugin] of plugins) {
