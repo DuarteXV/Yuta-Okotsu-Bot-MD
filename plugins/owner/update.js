@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { loadPlugins } from "../core/pluginLoader.js";
+import { loadPlugins } from "../../core/pluginLoader.js";
 
 export default {
   name: ["update", "actualizar", "gitpull"],
