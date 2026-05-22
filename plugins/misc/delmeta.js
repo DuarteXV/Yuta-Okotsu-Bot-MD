@@ -1,4 +1,4 @@
-import { userMeta, defaultMeta } from './Sticker.js'
+import { db } from '../../database/db.js'
 
 export default {
   name: ['delmeta'],
@@ -8,9 +8,17 @@ export default {
 
   async run({ senderNum, react, reply }) {
     await react('🗑️')
-    userMeta.delete(senderNum)
+
+    const user = db.getUser(senderNum)
+    if (!user.text1 && !user.text2) return await reply({
+      text: `⚠️ No tienes ninguna marca establecida.`
+    })
+
+    delete user.text1
+    delete user.text2
+
     await reply({
-      text: `✅ *Marca reseteada*\n\n📦 *Pack:* ${defaultMeta.packname}\n✍️ *Autor:* ${defaultMeta.author}`
+      text: `✅ *Marca reseteada* a la del bot\n\n📦 *Pack:* ⚔️ Yuta Okotsu MD\n✍️ *Autor:* DuarteXV`
     })
   }
 }
