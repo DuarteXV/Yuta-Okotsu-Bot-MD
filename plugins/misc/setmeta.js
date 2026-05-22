@@ -11,10 +11,10 @@ export default {
 
     const texto = args.join(' ')
     if (!texto) return await reply({
-      text: `❌ Uso: *.setmeta Pack | Autor*\n\nEjemplo:\n*.setmeta Mi Pack | Mi Nombre*`
+      text: `❌ Uso: *.setmeta Pack | Autor*\n\nEjemplo:\n*.setmeta Yuta Okotsu | DuarteXV*`
     })
 
-    const partes = texto.split(/[\u2022|]/).map(s => s.trim())
+    const partes = texto.split('|').map(s => s.trim())
     if (partes.length < 2) return await reply({
       text: `❌ Separa pack y autor con *|*\n\nEjemplo:\n*.setmeta Mi Pack | Mi Nombre*`
     })
