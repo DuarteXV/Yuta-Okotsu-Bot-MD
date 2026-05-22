@@ -6,10 +6,7 @@ import { log } from "./logger.js";
 const SUBBOTS_DIR = "./sessions/subbots";
 if (!fs.existsSync(SUBBOTS_DIR)) fs.mkdirSync(SUBBOTS_DIR, { recursive: true });
 
-// ─── REGISTRO GLOBAL DE SOCKETS ACTIVOS ─────────────────
 export const activeBots = new Map();
-// { id: { label, jid, worker, status } }
-
 const workers = new Map();
 
 export function registerMainBot(sock, label = "MAIN") {
@@ -26,50 +23,6 @@ export function updateBotStatus(id, data) {
   activeBots.set(id, { ...current, ...data });
 }
 
-// ─── LANZAR SUBBOT COMO WORKER ───────────────────────────
-export function launchSubbot(id) {
-  if (workers.has(id)) return;
-
-  const sessionDir = path.resolve(`${SUBBOTS_DIR}/${id}`);
-  if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
-
-  log.info(`[MANAGER] Lanzando subbot: ${id}`);
-
-  const worker = new Worker("./core/subbotWorker.js", {
-    workerData: { id, sessionDir },
-  });
-
-  workers.set(id, worker);
-  activeBots.set(id, { label: id.toUpperCase(), jid: "Conectando...", status: "connecting" });
-
-  worker.on("message", (msg) => {
-    if (msg.type === "status") {
-      updateBotStatus(id, { jid: msg.jid, status: msg.status, label: id.toUpperCase() });
-    }
-    if (msg.type === "logged_out") {
-      log.warn(`[MANAGER] Subbot ${id} cerró sesión — eliminando...`);
-      removeSubbot(id);
-    }
-  });
-
-  worker.on("exit", (code) => {
-    workers.delete(id);
-    activeBots.set(id, { label: id.toUpperCase(), jid: "Desconectado", status: "offline" });
-    log.warn(`[MANAGER] Worker ${id} salió (code: ${code})`);
-
-    // Reconectar si la sesión sigue existiendo
-    if (fs.existsSync(path.join(sessionDir, "creds.json"))) {
-      log.info(`[MANAGER] Reconectando subbot ${id} en 5s...`);
-      setTimeout(() => launchSubbot(id), 5000);
-    }
-  });
-
-  worker.on("error", (err) => {
-    log.error(`[MANAGER] Worker ${id} error: ${err.message}`);
-  });
-}
-
-// ─── ELIMINAR SUBBOT ─────────────────────────────────────
 export function removeSubbot(id) {
   const worker = workers.get(id);
   if (worker) {
@@ -85,19 +38,52 @@ export function removeSubbot(id) {
   }
 }
 
-// ─── LANZAR TODOS LOS SUBBOTS EXISTENTES ─────────────────
-export function launchAllSubbots() {
-  if (!fs.existsSync(SUBBOTS_DIR)) return;
-  const dirs = fs.readdirSync(SUBBOTS_DIR, { withFileTypes: true })
-    .filter(e => e.isDirectory())
-    .map(e => e.name);
+export function launchSubbot(id) {
+  if (workers.has(id)) return;
 
-  if (dirs.length === 0) return;
-  log.info(`[MANAGER] Relanzando ${dirs.length} subbot(s)...`);
-  for (const id of dirs) launchSubbot(id);
+  const sessionDir = path.resolve(`${SUBBOTS_DIR}/${id}`);
+  if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
+
+  log.info(`[MANAGER] Lanzando subbot: ${id}`);
+
+  const worker = new Worker("./core/subbotWorker.js", {
+    workerData: { id, sessionDir },
+  });
+
+  workers.set(id, worker);
+
+  worker.on("message", (msg) => {
+    if (msg.type === "status") {
+      updateBotStatus(id, {
+        jid: msg.jid,
+        status: msg.status,
+        label: id.toUpperCase(),
+      });
+    }
+    if (msg.type === "logged_out") {
+      log.warn(`[MANAGER] Subbot ${id} cerró sesión — eliminando...`);
+      removeSubbot(id);
+    }
+  });
+
+  worker.on("exit", (code) => {
+    workers.delete(id);
+    log.warn(`[MANAGER] Worker ${id} salió (code: ${code})`);
+
+    const sessionDir2 = `${SUBBOTS_DIR}/${id}`;
+    if (fs.existsSync(path.join(sessionDir2, "creds.json"))) {
+      log.info(`[MANAGER] Reconectando subbot ${id} en 5s...`);
+      setTimeout(() => launchSubbot(id), 5000);
+    } else {
+      activeBots.delete(id);
+    }
+  });
+
+  worker.on("error", (err) => {
+    log.error(`[MANAGER] Worker ${id} error: ${err.message}`);
+  });
 }
 
-// ─── PEDIR CÓDIGO PARA NUEVO SUBBOT ─────────────────────
 export async function requestSubbotCode(id, phoneNumber) {
   const sessionDir = path.resolve(`${SUBBOTS_DIR}/${id}`);
   if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
@@ -113,11 +99,19 @@ export async function requestSubbotCode(id, phoneNumber) {
     });
 
     workers.set(id, worker);
-    activeBots.set(id, { label: id.toUpperCase(), jid: "Conectando...", status: "connecting" });
 
     const timeout = setTimeout(() => {
       reject(new Error("Timeout esperando código"))
     }, 15000)
+
+    // Limpiar si nunca se conecta en 2 minutos
+    const cleanupTimeout = setTimeout(() => {
+      const bot = activeBots.get(id)
+      if (!bot || bot.status !== "online") {
+        log.warn(`[MANAGER] Subbot ${id} nunca se conectó — eliminado`)
+        removeSubbot(id)
+      }
+    }, 2 * 60 * 1000)
 
     worker.on("message", (msg) => {
       if (msg.type === "code") {
@@ -125,9 +119,17 @@ export async function requestSubbotCode(id, phoneNumber) {
         resolve(msg.code)
       }
       if (msg.type === "status") {
-        updateBotStatus(id, { jid: msg.jid, status: msg.status })
+        updateBotStatus(id, {
+          jid: msg.jid,
+          status: msg.status,
+          label: id.toUpperCase(),
+        })
+        if (msg.status === "online") {
+          clearTimeout(cleanupTimeout)
+        }
       }
       if (msg.type === "logged_out") {
+        clearTimeout(cleanupTimeout)
         removeSubbot(id)
       }
     })
@@ -135,14 +137,29 @@ export async function requestSubbotCode(id, phoneNumber) {
     worker.on("exit", (code) => {
       workers.delete(id)
       clearTimeout(timeout)
-      if (fs.existsSync(path.join(sessionDir, "creds.json"))) {
+      const sessionDir2 = `${SUBBOTS_DIR}/${id}`
+      if (fs.existsSync(path.join(sessionDir2, "creds.json"))) {
         setTimeout(() => launchSubbot(id), 5000)
+      } else {
+        activeBots.delete(id)
       }
     })
 
     worker.on("error", (err) => {
       clearTimeout(timeout)
+      clearTimeout(cleanupTimeout)
       reject(err)
     })
   })
+}
+
+export function launchAllSubbots() {
+  if (!fs.existsSync(SUBBOTS_DIR)) return;
+  const dirs = fs.readdirSync(SUBBOTS_DIR, { withFileTypes: true })
+    .filter(e => e.isDirectory())
+    .map(e => e.name);
+
+  if (dirs.length === 0) return;
+  log.info(`[MANAGER] Relanzando ${dirs.length} subbot(s)...`);
+  for (const id of dirs) launchSubbot(id);
 }
