@@ -6,15 +6,14 @@ export default {
   category: 'misc',
   ownerOnly: false,
 
-  async run({ senderNum, args, react, reply }) {
+  async run({ senderNum, text, usedPrefix, react, reply }) {
     await react('⚙️')
 
-    const texto = args.join(' ')
-    if (!texto) return await reply({
+    if (!text) return await reply({
       text: `❌ Uso: *.setmeta Pack | Autor*\n\nEjemplo:\n*.setmeta Yuta Okotsu | DuarteXV*`
     })
 
-    const partes = texto.split('|').map(s => s.trim())
+    const partes = text.split('|').map(s => s.trim())
     if (partes.length < 2) return await reply({
       text: `❌ Separa pack y autor con *|*\n\nEjemplo:\n*.setmeta Mi Pack | Mi Nombre*`
     })
