@@ -14,20 +14,19 @@ export default {
   category: 'owner',
   ownerOnly: true,
 
-  async run({ react, reply, args }) {
+  async run({ react, reply }) {
     await react('🔍')
 
     const hora  = new Date().toLocaleTimeString('es-CO', { hour12: false })
     const fecha = new Date().toLocaleDateString('es-CO')
 
-    // ─── 1. VERIFICAR LIBRERÍAS DEL PACKAGE.JSON ────────
-    let libsOk = []
+    // ─── 1. LIBRERÍAS ────────────────────────────────────
+    let libsOk   = []
     let libsFail = []
 
     try {
-      const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf-8'))
+      const pkg  = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf-8'))
       const deps = Object.keys(pkg.dependencies || {})
-
       for (const dep of deps) {
         try {
           await import(dep)
@@ -40,64 +39,66 @@ export default {
       libsFail.push(`package.json: ${e.message}`)
     }
 
-    // ─── 2. VERIFICAR PLUGINS ────────────────────────────
+    // ─── 2. PLUGINS ──────────────────────────────────────
     let pluginsOk   = []
     let pluginsFail = []
 
     const pluginsDir = path.join(root, 'plugins')
     if (fs.existsSync(pluginsDir)) {
-      const walkDir = (dir) => {
+      const walkDir = async (dir) => {
         const entries = fs.readdirSync(dir, { withFileTypes: true })
         for (const entry of entries) {
           const full = path.join(dir, entry.name)
-          if (entry.isDirectory()) walkDir(full)
+          if (entry.isDirectory()) await walkDir(full)
           else if (entry.name.endsWith('.js')) {
             try {
-              const code = fs.readFileSync(full, 'utf-8')
-              // Verificar sintaxis básica con node --check
-              require('child_process').execSync(`node --input-type=module --check`, {
-                input: code,
-                stdio: ['pipe', 'pipe', 'pipe']
-              })
+              await execAsync(`node --input-type=module --check < "${full}"`)
               pluginsOk.push(entry.name)
             } catch (e) {
-              pluginsFail.push({ name: entry.name, error: e.stderr?.toString()?.split('\n')[0] || e.message })
+              pluginsFail.push({
+                name: entry.name,
+                error: e.stderr?.split('\n')[0] || e.message
+              })
             }
           }
         }
       }
-      try { walkDir(pluginsDir) } catch {}
+      try { await walkDir(pluginsDir) } catch {}
     }
 
-    // ─── 3. VERIFICAR HERRAMIENTAS DEL SISTEMA ──────────
-    const tools = ['ffmpeg', 'ffprobe', 'node']
+    // ─── 3. HERRAMIENTAS ─────────────────────────────────
+    const tools = ['ffmpeg', 'ffprobe']
     const toolsStatus = {}
 
     for (const tool of tools) {
       try {
-        const { stdout } = await execAsync(`${tool} -version 2>&1 || ${tool} --version`)
-        const version = stdout.split('\n')[0].slice(0, 40)
-        toolsStatus[tool] = { ok: true, version }
+        const { stdout } = await execAsync(`${tool} -version 2>&1`)
+        toolsStatus[tool] = { ok: true, version: stdout.split('\n')[0].slice(0, 40) }
       } catch {
         toolsStatus[tool] = { ok: false }
       }
     }
 
-    // ─── 4. VERIFICAR NODE_MODULES ───────────────────────
+    // Node por separado
+    try {
+      const { stdout } = await execAsync(`node --version`)
+      toolsStatus['node'] = { ok: true, version: stdout.trim() }
+    } catch {
+      toolsStatus['node'] = { ok: false }
+    }
+
     const nodeModulesExiste = fs.existsSync(path.join(root, 'node_modules'))
 
-    // ─── ARMAR RESPUESTA ─────────────────────────────────
+    // ─── RESPUESTA ───────────────────────────────────────
     let text = `✨ ═══ 🫧 *YUTA OKOTSU* 🫧 ═══ ✨\n`
     text += `🔍 _Verificación del Sistema_\n\n`
 
-    // Herramientas
     text += `🔧 ─── ❖ *HERRAMIENTAS* ❖ ─── 🔧\n`
     for (const [tool, status] of Object.entries(toolsStatus)) {
       text += `  ${status.ok ? '✅' : '❌'} *${tool}*${status.ok ? `: ${status.version}` : ': No encontrado'}\n`
     }
-    text += `  ${nodeModulesExiste ? '✅' : '❌'} *node_modules*${nodeModulesExiste ? ': Instalado' : ': No instalado — ejecuta npm install'}\n\n`
+    text += `  ${nodeModulesExiste ? '✅' : '❌'} *node_modules*${nodeModulesExiste ? ': Instalado' : ': Falta — npm install'}\n\n`
 
-    // Librerías
     text += `📦 ─── ❖ *LIBRERÍAS* ❖ ─── 📦\n`
     text += `  ✅ OK: ${libsOk.length}\n`
     if (libsFail.length > 0) {
@@ -108,7 +109,6 @@ export default {
     }
     text += '\n'
 
-    // Plugins
     text += `🧩 ─── ❖ *PLUGINS* ❖ ─── 🧩\n`
     text += `  ✅ OK: ${pluginsOk.length}\n`
     if (pluginsFail.length > 0) {
