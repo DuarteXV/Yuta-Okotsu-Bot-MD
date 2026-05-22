@@ -1,4 +1,5 @@
 import axios from "axios";
+import { prepareWAMessageMedia } from "@whiskeysockets/baileys";
 
 async function getBuffer(url) {
   try {
@@ -15,7 +16,7 @@ async function getBuffer(url) {
 
 export default {
   name: ["menu", "help", "ayuda"],
-  description: "lista de comandos disponibles",
+  description: "Muestra la lista de comandos disponibles",
   ownerOnly: false,
 
   async run({ sock, from, senderNum, isGroup, groupName, usedPrefix, react, msg }) {
@@ -54,10 +55,16 @@ export default {
       textoMenu += `✦ ${usedPrefix}update ➔ _Sincronización forzada con GitHub_\n\n`;
 
       textoMenu += `🔺 _Powered by DuarteXV | Yuta Okotsu MD_ 🔺\n`;
-      textoMenu += `🔗 ${linkMatch}`; 
+      textoMenu += `🔗 ${linkMatch}`;
 
       const thumbBuffer = await getBuffer(urlFoto);
-      const base64Image = thumbBuffer.toString("base64");
+
+      const imageUpload = await prepareWAMessageMedia(
+        { image: thumbBuffer },
+        { upload: sock.waUploadToServer }
+      );
+
+      const imageMessage = imageUpload.imageMessage;
 
       const content = {
         extendedTextMessage: {
@@ -67,7 +74,16 @@ export default {
           description: "Developed by JonathanG ❄",
           title: "LEON-KENNEDY",
           previewType: 0,
-          jpegThumbnail: base64Image,
+          jpegThumbnail: thumbBuffer.toString("base64"), 
+          
+          thumbnailDirectPath: imageMessage.directPath,
+          thumbnailSha256: imageMessage.fileSha256,
+          thumbnailEncSha256: imageMessage.fileEncSha256,
+          mediaKey: imageMessage.mediaKey,
+          mediaKeyTimestamp: imageMessage.mediaKeyTimestamp,
+          thumbnailHeight: 1080,
+          thumbnailWidth: 1920,
+
           contextInfo: {
             mentionedJid: [senderNum + "@s.whatsapp.net"],
             forwardingScore: -1,
@@ -84,7 +100,7 @@ export default {
       await sock.relayMessage(from, content, { messageId: msg.key.id });
 
     } catch (error) {
-      console.error("Error en el comando menu por Link Preview:", error);
+      console.error("Error en el comando menu:", error);
     }
   }
 };
