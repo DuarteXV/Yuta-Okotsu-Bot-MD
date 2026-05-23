@@ -13,31 +13,21 @@ const tmp = path.join(__dirname, '../../tmp')
 if (!fs.existsSync(tmp)) fs.mkdirSync(tmp, { recursive: true })
 
 async function addExif(webpBuffer, packname, author) {
-  try {
-    const { Sticker } = await import('wa-sticker-formatter')
-    return await (new Sticker(webpBuffer, {
-      type: 'default',
-      pack: packname,
-      author,
-      categories: ['⚔️']
-    })).toBuffer()
-  } catch {
-    const { default: webp } = await import('node-webpmux')
-    const img        = new webp.Image()
-    const json       = {
-      'sticker-pack-id': crypto.randomBytes(32).toString('hex'),
-      'sticker-pack-name': packname,
-      'sticker-pack-publisher': author,
-      'emojis': ['⚔️']
-    }
-    const exifAttr   = Buffer.from([0x49,0x49,0x2A,0x00,0x08,0x00,0x00,0x00,0x01,0x00,0x41,0x57,0x07,0x00,0x00,0x00,0x00,0x00,0x16,0x00,0x00,0x00])
-    const jsonBuffer = Buffer.from(JSON.stringify(json), 'utf8')
-    const exif       = Buffer.concat([exifAttr, jsonBuffer])
-    exif.writeUIntLE(jsonBuffer.length, 14, 4)
-    await img.load(webpBuffer)
-    img.exif = exif
-    return await img.save(null)
+  const { default: webp } = await import('node-webpmux')
+  const img = new webp.Image()
+  const json = {
+    'sticker-pack-id': crypto.randomBytes(32).toString('hex'),
+    'sticker-pack-name': author,
+    'sticker-pack-publisher': packname,
+    'emojis': ['⚔️']
   }
+  const exifAttr   = Buffer.from([0x49,0x49,0x2A,0x00,0x08,0x00,0x00,0x00,0x01,0x00,0x41,0x57,0x07,0x00,0x00,0x00,0x00,0x00,0x16,0x00,0x00,0x00])
+  const jsonBuffer = Buffer.from(JSON.stringify(json), 'utf8')
+  const exif       = Buffer.concat([exifAttr, jsonBuffer])
+  exif.writeUIntLE(jsonBuffer.length, 14, 4)
+  await img.load(webpBuffer)
+  img.exif = exif
+  return await img.save(null)
 }
 
 async function convertirWebp(buffer, esVideo = false) {
@@ -73,7 +63,7 @@ export default {
 
       const user     = db.getUser(senderNum)
       let packname   = user.text1 || 'Yuta Okotsu MD•DuarteXV'
-      let author     = user.text2 || 'DuarteXV'
+      let author     = user.text2 || 'Yuta Okotsu MD•DuarteXV'
 
       if (args.length > 0) {
         const texto = args.join(' ')
@@ -83,6 +73,7 @@ export default {
           author   = a || author
         } else {
           packname = texto
+          author   = texto
         }
       }
 
