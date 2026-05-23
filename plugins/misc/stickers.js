@@ -6,6 +6,7 @@ import { exec } from 'child_process'
 import { promisify } from 'util'
 import { downloadMediaMessage } from '@whiskeysockets/baileys'
 import { db } from '../../database/db.js'
+import config from '../../config.js'
 
 const execAsync = promisify(exec)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -61,12 +62,9 @@ export default {
     try {
       await react('🕒')
 
-      const hora  = new Date().toLocaleTimeString('es-CO', { hour12: false })
-      const fecha = new Date().toLocaleDateString('es-CO')
-
-      const user   = db.getUser(senderNum)
-      let packname = user.text1 || `⏤͟͞ू⃪ ✦ ⚔️ ✦ ⏤͟͞ू⃪\n𖤓 Yuta Okotsu MD\n𖤓 By DuarteXV\n𖤓 ${fecha}\n𖤓 ${hora}`
-      let author   = user.text2 || `⚔️ Yuta Okotsu MD ⚔️\n「 DuarteXV 」`
+      const user     = db.getUser(senderNum)
+      let packname   = user.text1 || config.packname
+      let author     = user.text2 || config.wm
 
       if (args.length > 0) {
         const texto = args.join(' ')
