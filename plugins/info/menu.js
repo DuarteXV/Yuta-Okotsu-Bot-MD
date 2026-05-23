@@ -1,27 +1,34 @@
+import axios from "axios";
 import { prepareWAMessageMedia } from "@whiskeysockets/baileys";
-import fetch from "node-fetch";
+
+async function getBuffer(url) {
+  try {
+    const res = await axios({
+      method: "get",
+      url: url,
+      responseType: "arraybuffer"
+    });
+    return Buffer.from(res.data);
+  } catch (e) {
+    throw new Error(`Error descargando imagen: ${e.message}`);
+  }
+}
 
 export default {
   name: ["menu", "help", "ayuda"],
-  description: "Muestra el menú estético utilizando la lógica de renderizado multimedia del welcome",
+  description: "Muestra el menú.",
   ownerOnly: false,
 
   async run({ sock, from, senderNum, isGroup, groupName, usedPrefix, react, msg }) {
     try {
       await react("⛩️");
 
-      let botId = sock.user?.id || '';
-      let botSettings = global.db.data.settings[botId] || {};
-
-      global.botname = botSettings.botName || global.botname || 'KennyBot';
-      let nombreLargo = botSettings.botText || global.botname || 'KennyBot-MD';
-      let devText = `${nombreLargo}, Developed by JonathanG ❄`;
-
       const hora = new Date().toLocaleTimeString("es-CO", { hour12: false });
       const fecha = new Date().toLocaleDateString("es-CO");
       const lugar = isGroup ? groupName : "Chat Privado";
-      
-      let redes = "https://mancosyasiociados.wuaze.com/";
+
+      const urlFoto = "https://raw.githubusercontent.com/DuarteXV/Yotsuba-MD-Premium/main/uploads/81af45f44481e159.jpg";
+      const linkMatch = "https://mancosyasiociados.wuaze.com/";
 
       let textoMenu = `✨ ═══ 🫧 *YUTA OKOTSU* 🫧 ═══ ✨\n`;
       textoMenu += `⚔️ _¡El Hechicero de Grado Especial ha despertado!_\n\n`;
@@ -48,68 +55,46 @@ export default {
       textoMenu += `✦ ${usedPrefix}update ➔ _Sincronización forzada con GitHub_\n\n`;
 
       textoMenu += `🔺 _Powered by DuarteXV | Yuta Okotsu MD_ 🔺\n`;
-      textoMenu += `🔗 ${redes}`;
+      textoMenu += `🔗 ${linkMatch}`;
 
-      // --- LÓGICA DE IMAGEN EN CASCADA EXTRAÍDA DE TU WELCOME ---
-      let mediaUrl = null;
-
-      // 1. Si hay Banner configurado en el menú
-      if (botSettings.logo?.banner) {
-          let bData = botSettings.logo.banner;
-          if (typeof bData === 'object' && bData.url) {
-              mediaUrl = bData.url;
-          } else if (typeof bData === 'string') {
-              mediaUrl = bData;
-          }
-      } 
-      // 2. Base por defecto global
-      else if (global.banner) {
-          mediaUrl = global.banner;
-      }
-
-      // 3. Si no hay nada, foto de perfil del Bot
-      if (!mediaUrl) {
-          mediaUrl = await sock.profilePictureUrl(sock.user?.id.split(':')[0] + '@s.whatsapp.net', 'image').catch(_ => 'https://files.catbox.moe/xr2m6u.jpg');
-      }
-
-      // --- PROCESAMIENTO MULTIMEDIA EXACTO DE TU WELCOME ---
-      let bufferBanner;
-      try { bufferBanner = await (await fetch(mediaUrl)).buffer(); } 
-      catch { bufferBanner = await (await fetch('https://files.catbox.moe/xr2m6u.jpg')).buffer(); }
+      const bufferBanner = await getBuffer(urlFoto);
 
       const mediaBanner = await prepareWAMessageMedia(
           { image: bufferBanner }, 
-          { upload: sock.waUploadToServer, mediaTypeOverride: "thumbnail-link" } // El truco clave
+          { upload: sock.waUploadToServer, mediaTypeOverride: "thumbnail-link" }
       );
+      
       const imgBanner = mediaBanner.imageMessage;
+      
       const getTs = (ts) => typeof ts === 'object' ? Number(ts.low || ts) : Number(ts);
 
-      // --- ESTRUCTURA EXTENDEDTEXTMESSAGE ADAPTADA AL MENÚ ---
+      // 3. Estructuramos el payload idéntico a tu función sendMagicMessage
       const content = {
           extendedTextMessage: {
               endCardTiles: [],
               text: textoMenu, 
-              matchedText: redes, 
-              canonicalUrl: redes,
-              description: devText, 
+              matchedText: linkMatch, 
+              canonicalUrl: linkMatch,
+              description: "Developed by JonathanG ❄", 
               title: "LEON-KENNEDY", 
               previewType: 0, 
               
+              // Inyección de metadata del servidor
               jpegThumbnail: imgBanner.jpegThumbnail, 
               thumbnailDirectPath: imgBanner.directPath,
               thumbnailSha256: imgBanner.fileSha256,
               thumbnailEncSha256: imgBanner.fileEncSha256,
               mediaKey: imgBanner.mediaKey,
               mediaKeyTimestamp: getTs(imgBanner.mediaKeyTimestamp),
-              thumbnailHeight: imgBanner.height || 735,
-              thumbnailWidth: imgBanner.width || 735,
+              thumbnailHeight: imgBanner.height || 1080,
+              thumbnailWidth: imgBanner.width || 1920,
               
               inviteLinkGroupTypeV2: 0, 
               
               contextInfo: {
                   mentionedJid: [senderNum + "@s.whatsapp.net"],
-                  forwardingScore: 9999,
                   isForwarded: true,
+                  forwardingScore: 9999,
                   forwardedNewsletterMessageInfo: {
                       newsletterJid: "120363368618055639@newsletter", 
                       newsletterName: "Mancos Y Asociados Channel",
@@ -122,7 +107,7 @@ export default {
       await sock.relayMessage(from, content, { messageId: msg.key.id });
 
     } catch (error) {
-      console.error("Error en el comando menu con la lógica del welcome:", error);
+      console.error("Error crítico en el comando menu:", error);
     }
   }
 };
