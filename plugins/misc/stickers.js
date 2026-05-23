@@ -63,7 +63,7 @@ export default {
 
       const user     = db.getUser(senderNum)
       let packname   = user.text1 || '⚔️ Yuta Okotsu MD'
-      let author     = user.text2 || 'DuarteXV'
+      let author     = user.text2 || 'Yuta Okotsu MD•DuarteXV'
 
       if (args.length > 0) {
         const texto = args.join(' ')
@@ -72,7 +72,7 @@ export default {
           packname = p || packname
           author   = a || author
         } else {
-          packname = texto
+          author = texto
         }
       }
 
@@ -96,7 +96,7 @@ export default {
       const targetType = mediaMsg ? msgType : quotedType
 
       if (!targetMsg) return await reply({
-        text: `❌ Envía o responde una imagen, video (máx 15s) o sticker.\n\n💡 *${usedPrefix}s* ➔ sticker normal\n💡 *${usedPrefix}s Pack | Autor* ➔ marca personalizada`
+        text: `❌ Envía o responde una imagen, video (máx 15s) o sticker.\n\n💡 *${usedPrefix}s* ➔ sticker normal\n💡 *${usedPrefix}s MiMarca* ➔ marca personalizada`
       })
 
       const buffer    = await downloadMediaMessage(targetMsg, 'buffer', {}, { sock })
