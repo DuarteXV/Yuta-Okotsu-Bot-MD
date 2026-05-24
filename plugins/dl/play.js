@@ -1,18 +1,21 @@
 import axios from "axios";
 import yts from "yt-search";
 
-const API_KEY = "free_key";
+const API_KEY = "Zyzz-1234";
+
+const MAX_AUDIO = 16 * 1024 * 1024;
+const MAX_VIDEO = 64 * 1024 * 1024;
 
 export default {
-  name: ["play"],
+  name: ["play", "yta", "ytmp3", "playaudio"],
   description: "Descarga música de YouTube",
   ownerOnly: false,
 
-  async run({ sock, from, msg, text, reply, react }) {
+  async run({ sock, from, msg, text, cmdName, reply, react }) {
     try {
-      if (!text) {
+      if (!text.trim()) {
         return reply({
-          text: "✧ Ingresa un nombre o link",
+          text: "⚽ Ingresa el nombre o enlace del video.",
         });
       }
 
@@ -20,58 +23,122 @@ export default {
 
       const search = await yts(text);
 
-      if (!search.videos.length) {
+      const yt =
+        search.videos?.[0] ||
+        search.all?.[0];
+
+      if (!yt) {
         return reply({
-          text: "❌ Sin resultados",
+          text: "✧ No se encontraron resultados.",
         });
       }
 
-      const video = search.videos[0];
+      const {
+        title,
+        thumbnail,
+        timestamp,
+        views,
+        ago,
+        url
+      } = yt;
 
-      const api = `https://yosoyyo-api-ofc.onrender.com/api/youtube?q=${encodeURIComponent(video.url)}&apiKey=${API_KEY}`;
-
-      const res = await axios.get(api);
-
-      const data = res.data?.result?.[0];
-
-      if (!data) {
-        return reply({
-          text: "❌ Error obteniendo audio",
-        });
-      }
-
-      const mp3 =
-        data.download?.mp3 ||
-        data.downloads?.mp3?.url;
-
-      if (!mp3) {
-        return reply({
-          text: "❌ No se encontró mp3",
-        });
-      }
-
-      await reply({
-        text: `🎵 *${video.title}*\n⏳ Enviando audio...`,
-      });
-
-      const audio = await axios.get(mp3, {
-        responseType: "arraybuffer",
-        headers: {
-          "User-Agent": "Mozilla/5.0",
-        },
-      });
-
-      const buffer = Buffer.from(audio.data);
+      const vistas = formatViews(views);
 
       await sock.sendMessage(
         from,
         {
-          audio: buffer,
-          mimetype: "audio/mp4",
-          ptt: false,
+          image: { url: thumbnail },
+          caption:
+            `⚽ 𝗬𝗼𝘂𝗧𝘂𝗯𝗲 𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱\n` +
+            `> 🎬 *${title}*\n` +
+            `> 👁️ *${vistas}*\n` +
+            `> ⏱️ *${timestamp}*\n` +
+            `> 📅 *${ago}*\n\n` +
+            `⚽ Procesando archivo...`
         },
         { quoted: msg }
       );
+
+      const type = [
+        "play",
+        "yta",
+        "ytmp3",
+        "playaudio"
+      ].includes(cmdName)
+        ? "audio"
+        : "video";
+
+      const api =
+        `https://rest.apicausas.xyz/api/v1/descargas/youtube?url=${encodeURIComponent(url)}&type=${type}&apikey=${API_KEY}`;
+
+      const res = await axios.get(api, {
+        timeout: 30000,
+      });
+
+      const json = res.data;
+
+      if (!json?.status || !json?.data?.download?.url) {
+        return reply({
+          text: "❌ No se pudo descargar el archivo",
+        });
+      }
+
+      const dlUrl = json.data.download.url;
+
+      let fileSize = 0;
+
+      try {
+        const head = await axios.head(dlUrl);
+
+        fileSize = parseInt(
+          head.headers["content-length"] || "0"
+        );
+      } catch {}
+
+      if (type === "audio") {
+        if (fileSize > MAX_AUDIO) {
+          await sock.sendMessage(
+            from,
+            {
+              document: { url: dlUrl },
+              fileName: `${title}.mp3`,
+              mimetype: "audio/mpeg",
+            },
+            { quoted: msg }
+          );
+        } else {
+          await sock.sendMessage(
+            from,
+            {
+              audio: { url: dlUrl },
+              mimetype: "audio/mpeg",
+              ptt: false,
+            },
+            { quoted: msg }
+          );
+        }
+      } else {
+        if (fileSize > MAX_VIDEO) {
+          await sock.sendMessage(
+            from,
+            {
+              document: { url: dlUrl },
+              fileName: `${title}.mp4`,
+              mimetype: "video/mp4",
+            },
+            { quoted: msg }
+          );
+        } else {
+          await sock.sendMessage(
+            from,
+            {
+              video: { url: dlUrl },
+              mimetype: "video/mp4",
+            },
+            { quoted: msg }
+          );
+        }
+      }
 
       await react("✅");
 
@@ -81,8 +148,26 @@ export default {
       await react("❌");
 
       await reply({
-        text: `❌ ${e.message}`,
+        text: `⚠︎ Error: ${e.message}`,
       });
     }
   },
 };
+
+function formatViews(views) {
+  if (!views) return "No disponible";
+
+  if (views >= 1e9) {
+    return `${(views / 1e9).toFixed(1)}B`;
+  }
+
+  if (views >= 1e6) {
+    return `${(views / 1e6).toFixed(1)}M`;
+  }
+
+  if (views >= 1e3) {
+    return `${(views / 1e3).toFixed(1)}k`;
+  }
+
+  return views.toString();
+}
