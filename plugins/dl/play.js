@@ -3,9 +3,6 @@ import yts from "yt-search";
 
 const API_KEY = "Zyzz-1234";
 
-const MAX_AUDIO = 16 * 1024 * 1024;
-const MAX_VIDEO = 64 * 1024 * 1024;
-
 export default {
   name: ["play", "yta", "ytmp3", "playaudio"],
   description: "Descarga música de YouTube",
@@ -53,7 +50,7 @@ export default {
             `︶꒦꒷ ${vistas} vistas\n` +
             `︶꒦꒷ ${timestamp}\n` +
             `︶꒦꒷ ${ago}\n\n` +
-            `₊ ⊹ descarga en proceso`
+            `₊ ⊹ obteniendo audio`
         },
         { quoted: msg }
       );
@@ -71,7 +68,7 @@ export default {
         `https://rest.apicausas.xyz/api/v1/descargas/youtube?url=${encodeURIComponent(url)}&type=${type}&apikey=${API_KEY}`;
 
       const res = await axios.get(api, {
-        timeout: 30000,
+        timeout: 90000,
       });
 
       const json = res.data;
@@ -84,59 +81,25 @@ export default {
 
       const dlUrl = json.data.download.url;
 
-      let fileSize = 0;
-
-      try {
-        const head = await axios.head(dlUrl);
-
-        fileSize = parseInt(
-          head.headers["content-length"] || "0"
-        );
-      } catch {}
-
       if (type === "audio") {
-        if (fileSize > MAX_AUDIO) {
-          await sock.sendMessage(
-            from,
-            {
-              document: { url: dlUrl },
-              fileName: `${title}.mp3`,
-              mimetype: "audio/mpeg",
-            },
-            { quoted: msg }
-          );
-        } else {
-          await sock.sendMessage(
-            from,
-            {
-              audio: { url: dlUrl },
-              mimetype: "audio/mpeg",
-              ptt: false,
-            },
-            { quoted: msg }
-          );
-        }
+        await sock.sendMessage(
+          from,
+          {
+            audio: { url: dlUrl },
+            mimetype: "audio/mpeg",
+            ptt: false,
+          },
+          { quoted: msg }
+        );
       } else {
-        if (fileSize > MAX_VIDEO) {
-          await sock.sendMessage(
-            from,
-            {
-              document: { url: dlUrl },
-              fileName: `${title}.mp4`,
-              mimetype: "video/mp4",
-            },
-            { quoted: msg }
-          );
-        } else {
-          await sock.sendMessage(
-            from,
-            {
-              video: { url: dlUrl },
-              mimetype: "video/mp4",
-            },
-            { quoted: msg }
-          );
-        }
+        await sock.sendMessage(
+          from,
+          {
+            video: { url: dlUrl },
+            mimetype: "video/mp4",
+          },
+          { quoted: msg }
+        );
       }
 
       await react("✅");
