@@ -1,7 +1,7 @@
 import axios from 'axios'
 import yts from 'yt-search'
 
-const API_KEY = '' // API KEY
+const API_KEY = 'free_key' // API KEY
 
 const handler = async (m, { conn, text, usedPrefix, command }) => {
   if (!text) {
