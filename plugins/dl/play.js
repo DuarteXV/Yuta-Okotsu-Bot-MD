@@ -3,84 +3,65 @@ import yts from 'yt-search'
 
 const API_KEY = 'free_key' // API KEY
 
-const handler = async (m, { conn, text, usedPrefix, command }) => {
-  if (!text) {
-    return m.reply(`✧ Ingresa el nombre o link\n\nEjemplo:\n${usedPrefix + command} hola remix`)
-  }
+export default {
+  name: ['play'],
+  description: 'Descarga música de YouTube',
+  category: 'downloader',
+  ownerOnly: false,
 
-  await m.reply('🔍 Buscando...')
+  async run({ sock, from, msg, react, reply, text }) {
+    try {
+      if (!text) return reply({ text: '✧ Ingresa un nombre o link' })
 
-  try {
-    let videoUrl = text
+      await react('🔍')
 
-    if (!text.includes('youtube.com') && !text.includes('youtu.be')) {
-      const search = await yts(text)
+      let videoUrl = text
 
-      if (!search.videos.length) {
-        return m.reply('❌ No encontré resultados')
+      if (!text.includes('youtube.com') && !text.includes('youtu.be')) {
+        const search = await yts(text)
+        if (!search.videos.length) return reply({ text: '❌ Sin resultados' })
+        videoUrl = search.videos[0].url
       }
 
-      videoUrl = search.videos[0].url
-    }
+      const apis = [
+        `https://yosoyyo-api-ofc.onrender.com/api/youtube?q=${encodeURIComponent(videoUrl)}&apiKey=${API_KEY}`,
+      ]
 
-    const apis = [
-      `https://yosoyyo-api-ofc.onrender.com/api/youtube?q=${encodeURIComponent(videoUrl)}&apiKey=${API_KEY}`,
-    ]
+      let data = null
 
-    let data = null
-
-    for (const api of apis) {
-      for (let i = 0; i < 3; i++) {
-        try {
-          const res = await axios.get(api, {
-            timeout: 30000
-          })
-
-          if (res.data?.result?.length) {
-            data = res.data.result[0]
-            break
-          }
-        } catch {}
-      }
-
-      if (data) break
-    }
-
-    if (!data) {
-      return m.reply('❌ Error al obtener el audio')
-    }
-
-    const title = data.title
-    const mp3 = data.download?.mp3 || data.downloads?.mp3?.url
-
-    await conn.sendMessage(m.chat, {
-      text: `🎵 ${title}`,
-      contextInfo: {
-        externalAdReply: {
-          title,
-          body: 'YOSOYYO API',
-          mediaType: 1,
-          previewType: 0,
-          renderLargerThumbnail: true,
-          thumbnailUrl: 'https://i.imgur.com/JPXxVxN.jpeg',
-          sourceUrl: videoUrl
+      for (const api of apis) {
+        for (let i = 0; i < 3; i++) {
+          try {
+            const res = await axios.get(api, { timeout: 30000 })
+            if (res.data?.result?.length) {
+              data = res.data.result[0]
+              break
+            }
+          } catch {}
         }
+        if (data) break
       }
-    }, { quoted: m })
 
-    await conn.sendMessage(m.chat, {
-      audio: { url: mp3 },
-      mimetype: 'audio/mpeg',
-      fileName: `${title}.mp3`
-    }, { quoted: m })
+      if (!data) return reply({ text: '❌ Error API' })
 
-  } catch (e) {
-    m.reply(`❌ ${e.message}`)
+      const title = data.title
+      const mp3 = data.download?.mp3 || data.downloads?.mp3?.url
+
+      await sock.sendMessage(from, {
+        text: `🎵 ${title}`
+      }, { quoted: msg })
+
+      await sock.sendMessage(from, {
+        audio: { url: mp3 },
+        mimetype: 'audio/mpeg',
+        fileName: `${title}.mp3`
+      }, { quoted: msg })
+
+      await react('✅')
+
+    } catch (error) {
+      await react('❌')
+      await reply({ text: `❌ Error: ${error.message}` })
+    }
   }
 }
-
-handler.help = ['play']
-handler.tags = ['downloader']
-handler.command = ['play', 'ytplay', 'music']
-
-export default handler
