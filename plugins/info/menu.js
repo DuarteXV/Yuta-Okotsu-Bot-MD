@@ -68,7 +68,7 @@ export default {
       
       const getTs = (ts) => typeof ts === 'object' ? Number(ts.low || ts) : Number(ts);
 
- sendMagicMessage
+      // 3. Estructuramos el payload idéntico a tu función sendMagicMessage
       const content = {
           extendedTextMessage: {
               endCardTiles: [],
@@ -79,6 +79,7 @@ export default {
               title: "YUTA OKOTSU", 
               previewType: 0, 
               
+              // Inyección de metadata del servidor
               jpegThumbnail: imgBanner.jpegThumbnail, 
               thumbnailDirectPath: imgBanner.directPath,
               thumbnailSha256: imgBanner.fileSha256,
