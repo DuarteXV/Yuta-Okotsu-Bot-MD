@@ -60,12 +60,17 @@ export default {
 
       const audio = await axios.get(mp3, {
         responseType: "arraybuffer",
+        headers: {
+          "User-Agent": "Mozilla/5.0",
+        },
       });
+
+      const buffer = Buffer.from(audio.data);
 
       await sock.sendMessage(
         from,
         {
-          audio: audio.data,
+          document: buffer,
           mimetype: "audio/mpeg",
           fileName: `${video.title}.mp3`,
         },
