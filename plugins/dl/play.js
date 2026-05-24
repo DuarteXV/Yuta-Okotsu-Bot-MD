@@ -15,7 +15,7 @@ export default {
     try {
       if (!text.trim()) {
         return reply({
-          text: "﹒escribe el nombre o link del video",
+          text: "˖ ࣪ 𐙚 escribe el nombre o link del video",
         });
       }
 
@@ -29,7 +29,7 @@ export default {
 
       if (!yt) {
         return reply({
-          text: "﹒no encontré resultados",
+          text: "˖ ࣪ 𐙚 no encontré resultados",
         });
       }
 
@@ -49,10 +49,11 @@ export default {
         {
           image: { url: thumbnail },
           caption:
-            `﹒${title}\n\n` +
-            `꒰ ${vistas} vistas\n` +
-            `꒰ ${timestamp}\n` +
-            `꒰ ${ago}`
+            `˖ ࣪ 𐙚 ${title}\n\n` +
+            `︶꒦꒷ ${vistas} vistas\n` +
+            `︶꒦꒷ ${timestamp}\n` +
+            `︶꒦꒷ ${ago}\n\n` +
+            `₊ ⊹ descarga en proceso`
         },
         { quoted: msg }
       );
@@ -77,7 +78,7 @@ export default {
 
       if (!json?.status || !json?.data?.download?.url) {
         return reply({
-          text: "﹒no pude obtener el archivo",
+          text: "˖ ࣪ 𐙚 no pude obtener el archivo",
         });
       }
 
@@ -146,7 +147,7 @@ export default {
       await react("❌");
 
       await reply({
-        text: `﹒${e.message}`,
+        text: `˖ ࣪ 𐙚 ${e.message}`,
       });
     }
   },
