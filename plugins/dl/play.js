@@ -30,15 +30,13 @@ export default {
 
       const api = `https://yosoyyo-api-ofc.onrender.com/api/youtube?q=${encodeURIComponent(video.url)}&apiKey=${API_KEY}`;
 
-      const res = await axios.get(api, {
-        timeout: 30000,
-      });
+      const res = await axios.get(api);
 
       const data = res.data?.result?.[0];
 
       if (!data) {
         return reply({
-          text: "❌ Error obteniendo el audio",
+          text: "❌ Error obteniendo audio",
         });
       }
 
@@ -48,14 +46,12 @@ export default {
 
       if (!mp3) {
         return reply({
-          text: "❌ No se encontró el mp3",
+          text: "❌ No se encontró mp3",
         });
       }
 
       await reply({
-        text:
-          `🎵 *${video.title}*\n` +
-          `⏳ Enviando audio...`,
+        text: `🎵 *${video.title}*\n⏳ Enviando audio...`,
       });
 
       const audio = await axios.get(mp3, {
@@ -70,9 +66,9 @@ export default {
       await sock.sendMessage(
         from,
         {
-          document: buffer,
-          mimetype: "audio/mpeg",
-          fileName: `${video.title}.mp3`,
+          audio: buffer,
+          mimetype: "audio/mp4",
+          ptt: false,
         },
         { quoted: msg }
       );
