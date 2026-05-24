@@ -1,66 +1,89 @@
-import axios from 'axios'
-import yts from 'yt-search'
+import axios from "axios";
+import yts from "yt-search";
 
-const API_KEY = 'free_key' // API KEY
+const API_KEY = "free_key";
 
 export default {
   name: ["play"],
   description: "Descarga música de YouTube",
   ownerOnly: false,
-  
-  async run({ sock, from, msg, react, reply, text }) {
+
+  async run({ sock, from, msg, text, reply, react }) {
     try {
-      if (!text) return reply({ text: '✧ Ingresa un nombre o link' })
-
-      await react('🔍')
-
-      let videoUrl = text
-
-      if (!text.includes('youtube.com') && !text.includes('youtu.be')) {
-        const search = await yts(text)
-        if (!search.videos.length) return reply({ text: '❌ Sin resultados' })
-        videoUrl = search.videos[0].url
+      if (!text) {
+        return reply({
+          text: "✧ Ingresa un nombre o link",
+        });
       }
 
-      const apis = [
-        `https://yosoyyo-api-ofc.onrender.com/api/youtube?q=${encodeURIComponent(videoUrl)}&apiKey=${API_KEY}`,
-      ]
+      await react("🔍");
 
-      let data = null
+      let videoUrl = text;
 
-      for (const api of apis) {
-        for (let i = 0; i < 3; i++) {
-          try {
-            const res = await axios.get(api, { timeout: 30000 })
-            if (res.data?.result?.length) {
-              data = res.data.result[0]
-              break
-            }
-          } catch {}
+      // Buscar en YouTube si no es link
+      if (
+        !text.includes("youtube.com") &&
+        !text.includes("youtu.be")
+      ) {
+        const search = await yts(text);
+
+        if (!search.videos.length) {
+          return reply({
+            text: "❌ Sin resultados",
+          });
         }
-        if (data) break
+
+        videoUrl = search.videos[0].url;
       }
 
-      if (!data) return reply({ text: '❌ Error API' })
+      // API
+      const api = `https://yosoyyo-api-ofc.onrender.com/api/youtube?q=${encodeURIComponent(
+        videoUrl
+      )}&apiKey=${API_KEY}`;
 
-      const title = data.title
-      const mp3 = data.download?.mp3 || data.downloads?.mp3?.url
+      const res = await axios.get(api, {
+        timeout: 30000,
+      });
 
-      await sock.sendMessage(from, {
-        text: `🎵 ${title}`
-      }, { quoted: msg })
+      const data = res.data?.result?.[0];
 
-      await sock.sendMessage(from, {
-        audio: { url: mp3 },
-        mimetype: 'audio/mpeg',
-        fileName: `${title}.mp3`
-      }, { quoted: msg })
+      if (!data) {
+        return reply({
+          text: "❌ Error API",
+        });
+      }
 
-      await react('✅')
+      const title = data.title;
+      const mp3 =
+        data.download?.mp3 ||
+        data.downloads?.mp3?.url;
 
-    } catch (error) {
-      await react('❌')
-      await reply({ text: `❌ Error: ${error.message}` })
+      // Info
+      await reply({
+        text: `🎵 *${title}*`,
+      });
+
+      // Audio
+      await sock.sendMessage(
+        from,
+        {
+          audio: { url: mp3 },
+          mimetype: "audio/mpeg",
+          fileName: `${title}.mp3`,
+        },
+        { quoted: msg }
+      );
+
+      await react("✅");
+
+    } catch (e) {
+      console.error(e);
+
+      await react("❌");
+
+      await reply({
+        text: `❌ Error:\n${e.message}`,
+      });
     }
   },
 };
