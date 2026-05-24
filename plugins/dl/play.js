@@ -4,101 +4,119 @@ import yts from "yt-search";
 const API_KEY = "free_key";
 
 export default {
-  name: ["play", "music"],
+  name: ["play"],
   description: "Descarga música de YouTube",
-  category: "downloader",
   ownerOnly: false,
 
   async run({ sock, from, msg, text, reply, react }) {
     try {
+      await reply({
+        text: "🐞 Debug iniciado",
+      });
+
       if (!text) {
         return reply({
-          text: "✧ Ingresa un nombre o link de YouTube",
+          text: "❌ No pusiste texto",
         });
       }
+
+      await reply({
+        text: `✅ Texto recibido:\n${text}`,
+      });
 
       await react("🔍");
 
-      let videoUrl = text;
+      // ─── BUSCAR VIDEO ───────────────────────────────
+      const search = await yts(text);
 
-      // ─── BUSCAR VIDEO SI NO ES LINK ───────────────────
-      if (
-        !text.includes("youtube.com") &&
-        !text.includes("youtu.be")
-      ) {
-        const search = await yts(text);
+      await reply({
+        text: `✅ Resultados encontrados: ${search.videos.length}`,
+      });
 
-        if (!search?.videos?.length) {
-          return reply({
-            text: "❌ No encontré resultados",
-          });
-        }
-
-        videoUrl = search.videos[0].url;
+      if (!search.videos.length) {
+        return reply({
+          text: "❌ Sin resultados",
+        });
       }
 
-      // ─── API ──────────────────────────────────────────
-      const api = `https://yosoyyo-api-ofc.onrender.com/api/youtube?q=${encodeURIComponent(
-        videoUrl
-      )}&apiKey=${API_KEY}`;
+      const video = search.videos[0];
 
-      const { data } = await axios.get(api, {
+      await reply({
+        text:
+          `🎵 Video encontrado:\n\n` +
+          `📌 ${video.title}\n` +
+          `🔗 ${video.url}`,
+      });
+
+      const api = `https://yosoyyo-api-ofc.onrender.com/api/youtube?q=${encodeURIComponent(video.url)}&apiKey=${API_KEY}`;
+
+      await reply({
+        text: "🌐 Consultando API...",
+      });
+
+      // ─── API ────────────────────────────────────────
+      const res = await axios.get(api, {
         timeout: 30000,
       });
 
-      // ─── VALIDAR RESPUESTA ────────────────────────────
-      const result =
-        data?.result?.[0] ||
-        data?.result ||
-        data;
+      await reply({
+        text:
+          `✅ API respondió\n\n` +
+          `${JSON.stringify(res.data).slice(0, 300)}`,
+      });
 
-      if (!result) {
+      const data = res.data?.result?.[0];
+
+      if (!data) {
         return reply({
-          text: "❌ La API no devolvió resultados",
+          text: "❌ La API no devolvió result[0]",
         });
       }
 
-      const title =
-        result.title ||
-        "audio";
-
       const mp3 =
-        result.download?.mp3 ||
-        result.downloads?.mp3?.url ||
-        result.mp3;
+        data.download?.mp3 ||
+        data.downloads?.mp3?.url;
+
+      await reply({
+        text:
+          `🎧 MP3:\n${mp3 ? "✅ Encontrado" : "❌ No encontrado"}`,
+      });
 
       if (!mp3) {
         return reply({
-          text: "❌ No se encontró el audio",
+          text: "❌ No hay mp3",
         });
       }
 
-      // ─── INFO ─────────────────────────────────────────
       await reply({
-        text: `🎵 *${title}*\n⏳ Enviando audio...`,
+        text: "📤 Enviando audio...",
       });
 
-      // ─── ENVIAR AUDIO ─────────────────────────────────
+      // ─── ENVIAR AUDIO ───────────────────────────────
       await sock.sendMessage(
         from,
         {
           audio: { url: mp3 },
           mimetype: "audio/mpeg",
-          ptt: false,
-          fileName: `${title}.mp3`,
+          fileName: `${data.title}.mp3`,
         },
         { quoted: msg }
       );
 
       await react("✅");
 
-    } catch (e) {
-      console.error("PLAY ERROR:", e);
+      await reply({
+        text: "✅ Audio enviado correctamente",
+      });
 
+    } catch (e) {
       await react("❌");
 
-      return reply({
-        text: `❌ Error:\n${e.message}`,
+      await reply({
+        text:
+          `❌ ERROR DEBUG\n\n` +
+          `📛 ${e.message}\n\n` +
+          `${e.stack?.slice(0, 1000)}`,
       });
     }
   },
