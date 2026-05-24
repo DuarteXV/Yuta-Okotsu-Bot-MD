@@ -12,17 +12,18 @@ const MEDIA_TYPES = {
   ptvMessage:      { ext: 'mp4',  mime: 'video/mp4' },
 }
 
-async function subirCDN(buffer, filename, expiration = 'never') {
-  const base64 = buffer.toString('base64')
-  const res = await axios.post(`${CDN_URL}/api/upload`, {
-    filename,
-    data: base64,
-    expiration
-  }, {
+async function subirCDN(buffer, filename, mimetype, expiration = 'never') {
+  const blob = new Blob([buffer], { type: mimetype })
+  const form = new FormData()
+  form.append('file', blob, filename)
+  form.append('expiration', expiration)
+
+  const res = await axios.post(`${CDN_URL}/api/upload`, form, {
     timeout: 120000,
     maxContentLength: Infinity,
     maxBodyLength: Infinity
   })
+
   return res.data
 }
 
@@ -97,7 +98,7 @@ export default {
       const buffer   = await downloadMediaMessage(targetMsg, 'buffer', {}, { sock })
       const filename = `${Date.now()}.${mediaInfo.ext}`
 
-      const resultado = await subirCDN(buffer, filename, expiration)
+      const resultado = await subirCDN(buffer, filename, mediaInfo.mime, expiration)
 
       const url = resultado?.url || resultado?.data?.url || resultado?.file?.url
 
