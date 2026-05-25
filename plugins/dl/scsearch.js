@@ -35,16 +35,16 @@ function msToTime(ms) {
 
 export default {
   name: ['scsearch', 'scbuscar', 'scb'],
-  description: 'Busca canciones en SoundCloud',
+  description: 'Busca canciones en SoundCloud y devuelve los links',
   category: 'dl',
   ownerOnly: false,
 
-  async run({ msg, from, sock, text, usedPrefix, react, reply }) {
+  async run({ text, usedPrefix, react, reply }) {
     try {
       await react('🔍')
 
       if (!text) return await reply({
-        text: `❌ Escribe el nombre a buscar.\n\n💡 *${usedPrefix}scbuscar bad bunny*`
+        text: `❌ Escribe el nombre a buscar.\n\n💡 *${usedPrefix}scsearch bad bunny*`
       })
 
       const clientId = await getClientId()
@@ -59,13 +59,13 @@ export default {
       let txt = `🎵 *Resultados para:* _${text}_\n\n`
 
       results.forEach((t, i) => {
-        txt += `*${i + 1}.* ${t.title}\n`
+        txt += `*${i + 1}.* *${t.title}*\n`
         txt += `   👤 ${t.user.username}\n`
         txt += `   ⏱️ ${msToTime(t.duration)}\n`
         txt += `   🔗 ${t.permalink_url}\n\n`
       })
 
-      txt += `💡 Usa *${usedPrefix}sc <url>* para descargar\n`
+      txt += `💡 Descarga con *${usedPrefix}scdl <url>*\n`
       txt += `⚔️ _Yuta Okotsu MD | DuarteXV_`
 
       await reply({ text: txt })
