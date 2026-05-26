@@ -62,7 +62,7 @@ export default {
           caption:
             `⛧ ${title}\n\n` +
             `⛧ vistas › ${vistas}\n` +
-            `⛧ duración › ${formatDuration(duration)}\n` +
+            `⛧ duración › ${formatDuration(duration || yt.seconds)}\n` +
             `⛧ calidad › 128 kbps\n` +
             `⛧ formato › mp3\n` +
             `⛧ link › ${youtube_url}`
@@ -112,15 +112,32 @@ function formatViews(views) {
   return views.toString();
 }
 
-function formatDuration(seconds) {
-  seconds = Number(seconds);
+function formatDuration(duration) {
+  if (!duration) return "No disponible";
 
-  const minutes = Math.floor(seconds / 60);
-  const secs = seconds % 60;
+  // Si ya viene tipo "3:24"
+  if (typeof duration === "string") {
+    if (duration.includes(":")) {
+      return duration;
+    }
 
-  if (minutes <= 0) {
-    return `${secs} segundos`;
+    duration = Number(duration);
   }
 
-  return `${minutes} minuto${minutes > 1 ? "s" : ""} ${secs} segundos`;
+  // Evita NaN
+  if (isNaN(duration)) {
+    return "No disponible";
+  }
+
+  const hours = Math.floor(duration / 3600);
+  const minutes = Math.floor((duration % 3600) / 60);
+  const seconds = Math.floor(duration % 60);
+
+  // Formato HH:MM:SS
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  // Formato MM:SS
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
