@@ -70,15 +70,30 @@ export default {
         { quoted: msg }
       );
 
-      await sock.sendMessage(
-        from,
-        {
-          audio: { url: download_url },
-          mimetype: "audio/mpeg",
-          ptt: false,
-        },
-        { quoted: msg }
-      );
+      const isLongAudio = yt.seconds > 1800; // 30 minutos
+
+      if (isLongAudio) {
+        await sock.sendMessage(
+          from,
+          {
+            document: { url: download_url },
+            mimetype: "audio/mpeg",
+            fileName: `${title}.mp3`,
+            caption: "⛧ audio enviado como documento por duración/tamaño",
+          },
+          { quoted: msg }
+        );
+      } else {
+        await sock.sendMessage(
+          from,
+          {
+            audio: { url: download_url },
+            mimetype: "audio/mpeg",
+            ptt: false,
+          },
+          { quoted: msg }
+        );
+      }
 
       await react("✅");
 
