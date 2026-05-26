@@ -3,14 +3,19 @@ export default {
   description: "Menciona a todos en el grupo",
   groupOnly: true,
   modOnly: true,
-  async run({ sock, from, groupMeta, text, reply }) {
-    const members = groupMeta?.participants || [];
-    const mentions = members.map((m) => m.id);
-    const texto = text || "📢 Atención!";
-    const lista = members.map((m) => `@${m.id.split("@")[0]}`).join("\n");
+
+  async run({ sock, from, msg, groupMeta, text, reply, react }) {
+    await react('📢')
+
+    const members  = groupMeta?.participants || []
+    const mentions = members.map(m => m.id)
+    const texto    = text || "📢 Atención!"
+
     await sock.sendMessage(from, {
-      text: `${texto}\n\n${lista}`,
+      text: texto,
       mentions,
-    });
-  },
-};
+    }, { quoted: msg })
+
+    await react('✅')
+  }
+}
