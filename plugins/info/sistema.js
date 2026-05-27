@@ -60,26 +60,6 @@ function getMemoryInfo() {
   }
 }
 
-function getDiskInfo() {
-  try {
-    // Disco REAL del contenedor
-    const stat = fs.statfsSync("/home/container");
-
-    const total = stat.blocks * stat.bsize;
-    const free = stat.bavail * stat.bsize;
-    const used = total - free;
-
-    return {
-      total,
-      free,
-      used
-    };
-
-  } catch {
-    return null;
-  }
-}
-
 export default {
   name: ["system", "sys", "stats"],
   description: "Muestra información real del sistema",
@@ -101,8 +81,6 @@ export default {
       const ramPercent = (
         (ramUsed / ramTotal) * 100
       ).toFixed(1);
-
-      const disk = getDiskInfo();
 
       const cpus = os.cpus();
 
@@ -136,13 +114,6 @@ export default {
       text += `  ⛧ *Usada:* ${formatBytes(ramUsed)} GB (${ramPercent}%)\n`;
       text += `  ✦ *Libre:* ${formatBytes(ramFree)} GB\n`;
       text += `  ⛧ *Bot usa:* ${formatBytes(ramBot)} GB\n\n`;
-
-      if (disk) {
-        text += `💾 ─── ❖ *DISCO* ❖ ─── 💾\n`;
-        text += `  ✦ *Total:* ${formatBytes(disk.total)} GB\n`;
-        text += `  ⛧ *Usado:* ${formatBytes(disk.used)} GB\n`;
-        text += `  ✦ *Libre:* ${formatBytes(disk.free)} GB\n\n`;
-      }
 
       text += `⏳ ─── ❖ *UPTIME* ❖ ─── ⏳\n`;
       text += `  ✦ *Bot activo:* ${formatTime(uptimeBot)}\n\n`;
