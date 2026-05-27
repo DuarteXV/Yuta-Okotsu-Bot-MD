@@ -3,30 +3,25 @@ import { log } from "./logger.js";
 import { getPlugins } from "./pluginLoader.js";
 import { db } from "../database/db.js";
 
-// ─── CACHE DE METADATA DE GRUPOS ─────────────────────────
 const groupCache = new Map();
 
 function cleanJid(jid = "") {
   return jid?.split(":")[0] + (jid?.includes("@") ? "@" + jid.split("@")[1] : "");
 }
 
-export async function handleMessage(sock, rawMsg) {
+export async function handleMessage(sock, rawMsg, botLabel = "MAIN") {
   try {
-    const msg = rawMsg;
+    const msg  = rawMsg;
     const from = msg.key?.remoteJid;
     if (!from) return;
     if (from === "status@broadcast") return;
     if (msg.key?.fromMe) return;
 
-    const isGroup = from.endsWith("@g.us");
-    const senderJid = isGroup
-      ? (msg.key?.participant || msg.participant || "")
-      : from;
+    const isGroup  = from.endsWith("@g.us");
+    const senderJid = isGroup ? (msg.key?.participant || msg.participant || "") : from;
+    const sender    = cleanJid(senderJid);
+    const botJid    = cleanJid(sock.user?.id);
 
-    const sender = cleanJid(senderJid);
-    const botJid = cleanJid(sock.user?.id);
-
-    // ─── CUERPO DEL MENSAJE ──────────────────────────────
     const body =
       msg.message?.conversation ||
       msg.message?.extendedTextMessage?.text ||
@@ -36,21 +31,20 @@ export async function handleMessage(sock, rawMsg) {
       msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
       "";
 
-    // ─── DETECTAR COMANDO (antes de groupMetadata) ───────
-    const prefixes = Array.isArray(config.prefix) ? config.prefix : [config.prefix];
+    const prefixes   = Array.isArray(config.prefix) ? config.prefix : [config.prefix];
     const usedPrefix = prefixes.find((p) => body.startsWith(p)) || null;
-    const isCmd = !!usedPrefix;
+    const isCmd      = !!usedPrefix;
 
-    // Si no es comando, salir inmediatamente sin consultar grupo ni DB
     if (!isCmd) return;
 
     const cmdName = body.slice(usedPrefix.length).trim().split(/\s+/)[0].toLowerCase();
-    const args = body.slice(usedPrefix.length + cmdName.length).trim().split(/\s+/);
-    const text = args.join(" ");
+    const args    = body.slice(usedPrefix.length + cmdName.length).trim().split(/\s+/);
+    const text    = args.join(" ");
 
-    // ─── GRUPO INFO (solo si es comando, con caché) ──────
+    // ─── GRUPO INFO ──────────────────────────────────────
     let groupName = "";
     let groupMeta = null;
+
     if (isGroup) {
       if (groupCache.has(from)) {
         groupMeta = groupCache.get(from);
@@ -60,19 +54,25 @@ export async function handleMessage(sock, rawMsg) {
           groupMeta = await sock.groupMetadata(from);
           groupName = groupMeta?.subject || from;
           groupCache.set(from, groupMeta);
-          // Expirar caché cada 10 minutos
           setTimeout(() => groupCache.delete(from), 10 * 60 * 1000);
         } catch {
           groupName = from;
         }
       }
+
+      // ─── FILTRO PRIMARY BOT ────────────────────────────
+      const primaryBot = db.getPrimary(from);
+      if (primaryBot) {
+        const myId = botJid.split("@")[0];
+        if (primaryBot !== myId) return;
+      }
     }
 
     // ─── PERMISOS ────────────────────────────────────────
     const senderNum = sender.split("@")[0];
-    const isOwner = config.ownerNumber.includes(senderNum);
+    const isOwner   = config.ownerNumber.includes(senderNum);
     const isCoOwner = config.coOwners.includes(senderNum);
-    const isMod = isOwner || isCoOwner || db.hasRole(senderNum, "mod");
+    const isMod     = isOwner || isCoOwner || db.hasRole(senderNum, "mod");
     const isPremium = isMod || db.hasRole(senderNum, "premium");
 
     log.message({ from, sender, isGroup, groupName, body, isCmd, cmdName });
@@ -84,6 +84,7 @@ export async function handleMessage(sock, rawMsg) {
       sender,
       senderNum,
       botJid,
+      botLabel,
       isGroup,
       groupName,
       groupMeta,
@@ -101,21 +102,15 @@ export async function handleMessage(sock, rawMsg) {
       react: (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } }),
     };
 
-    // ─── EJECUTAR COMANDO ────────────────────────────────
     const plugins = getPlugins();
-    const plugin = plugins.get(cmdName);
+    const plugin  = plugins.get(cmdName);
     if (!plugin) return;
 
-    if (plugin.ownerOnly && !isOwner)
-      return ctx.reply({ text: "❌ Solo el owner puede usar este comando." });
-    if (plugin.modOnly && !isMod)
-      return ctx.reply({ text: "❌ Solo moderadores pueden usar este comando." });
-    if (plugin.premiumOnly && !isPremium)
-      return ctx.reply({ text: "⭐ Este comando es exclusivo para premium." });
-    if (plugin.groupOnly && !isGroup)
-      return ctx.reply({ text: "👥 Este comando solo funciona en grupos." });
-    if (plugin.privateOnly && isGroup)
-      return ctx.reply({ text: "📩 Este comando solo funciona en privado." });
+    if (plugin.ownerOnly   && !isOwner)   return ctx.reply({ text: "❌ Solo el owner puede usar este comando." });
+    if (plugin.modOnly     && !isMod)     return ctx.reply({ text: "❌ Solo moderadores pueden usar este comando." });
+    if (plugin.premiumOnly && !isPremium) return ctx.reply({ text: "⭐ Este comando es exclusivo para premium." });
+    if (plugin.groupOnly   && !isGroup)   return ctx.reply({ text: "👥 Este comando solo funciona en grupos." });
+    if (plugin.privateOnly && isGroup)    return ctx.reply({ text: "📩 Este comando solo funciona en privado." });
 
     const start = Date.now();
     try {
