@@ -16,7 +16,7 @@ function formatTime(seconds) {
 
 function getMemoryInfo() {
   try {
-    // cgroup v2
+    // Docker / Pterodactyl (cgroup v2)
     const total = fs.readFileSync(
       "/sys/fs/cgroup/memory.max",
       "utf8"
@@ -62,10 +62,11 @@ function getMemoryInfo() {
 
 function getDiskInfo() {
   try {
-    const stat = fs.statfsSync("/");
+    // Disco REAL del contenedor
+    const stat = fs.statfsSync("/home/container");
 
     const total = stat.blocks * stat.bsize;
-    const free = stat.bfree * stat.bsize;
+    const free = stat.bavail * stat.bsize;
     const used = total - free;
 
     return {
