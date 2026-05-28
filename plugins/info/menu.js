@@ -12,13 +12,14 @@ async function getBuffer(url) {
 }
 
 const catIcons = {
-  info:    "🗺️",
-  misc:    "🎴",
-  dl:      "🎵",
-  grupos:  "👥",
-  owner:   "👑",
-  media:   "🎬",
-  util:    "🔧",
+  info:       "🗺️",
+  misc:       "🎴",
+  dl:         "🎵",
+  grupos:     "👥",
+  owner:      "👑",
+  media:      "🎬",
+  util:       "🔧",
+  downloader: "📥",
 }
 
 export default {
@@ -37,12 +38,12 @@ export default {
       const urlFoto   = "https://cdn.adoolab.xyz/dl/3d42f230.jpg";
       const linkMatch = "https://mancosyasociados.kesug.com";
 
-      // ─── AGRUPAR PLUGINS POR CATEGORÍA ───────────────
       const plugins    = getPlugins()
       const categories = {}
 
       for (const [, plugin] of plugins) {
         const cat = plugin.category || "misc"
+        if (cat === "owner") continue
         if (!categories[cat]) categories[cat] = new Set()
         const names = Array.isArray(plugin.name) ? plugin.name : [plugin.name]
         categories[cat].add(names[0])
