@@ -12,14 +12,14 @@ async function getBuffer(url) {
 }
 
 const catIcons = {
-  "꒰ 𝐈𝐧𝐟𝐨 ꒱":       "🌀",
-  "꒰ 𝐌𝐢𝐬𝐜 ꒱":       "💠",
-  "꒰ 𝐃𝐥 ꒱":         "☁",
-  "꒰ 𝐆𝐫𝐮𝐩𝐨𝐬 ꒱":     "❄",
-  "꒰ 𝐎𝐰𝐧𝐞𝐫 ꒱":      "👑",
-  "꒰ 𝐌𝐞𝐝𝐢𝐚 ꒱":      "💫",
-  "꒰ 𝐔𝐭𝐢𝐥 ꒱":       "🪽",
-  "꒰ 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝𝐞𝐫 ꒱": "🪐",
+  "info":       "🌀",
+  "misc":       "💠",
+  "dl":         "☁",
+  "grupos":     "❄",
+  "owner":      "👑",
+  "media":      "💫",
+  "util":       "🪽",
+  "downloader": "🪐",
 } 
 
 export default {
@@ -63,12 +63,15 @@ export default {
       textoMenu += `_𝐑𝐞𝐜𝐮𝐞𝐫𝐝𝐚 𝐔𝐬𝐚𝐫 𝐄𝐥 𝐏𝐫𝐞𝐟𝐢𝐣𝐨 [ ${usedPrefix} ] 𝐚𝐧𝐭𝐞𝐬 𝐝𝐞 𝐜𝐚𝐝𝐚 𝐨𝐫𝐝𝐞𝐧._\n\n`;
 
       for (const [cat, cmds] of Object.entries(categories)) {
-        const icon = catIcons[cat] || "🎴"
-        textoMenu += `${icon} ─── ❖ *${cat.toUpperCase()}* ❖ ─── ${icon}\n`
+        const categoriaLimped = cat.toLowerCase().trim();
+        const icon = catIcons[categoriaLimped] || "🎴";
+        const nombreFormateado = categoriaLimped.charAt(0).toUpperCase() + categoriaLimped.slice(1);
+        
+        textoMenu += `${icon} ─── ❖ *꒰ ${nombreFormateado} ꒱* ❖ ─── ${icon}\n`;
         for (const cmd of cmds) {
-          textoMenu += `✦ ${usedPrefix}${cmd}\n`
+          textoMenu += `✦ ${usedPrefix}${cmd}\n`;
         }
-        textoMenu += "\n"
+        textoMenu += "\n";
       }
 
       textoMenu += `🪼 _⎯꯭♱𝆬       ְ𝐏𝐨𝐰𝐞𝐫𝐞𝐝 𝐛𝐲 𝐃𝐮𝐚𝐫𝐭𝐞𝐗𝐕 | 𝐘𝐮𝐭𝐚 𝐎𝐤𝐨𝐭𝐬𝐮 𝐌𝐃_ 🪼\n`;
