@@ -35,46 +35,54 @@ const tag = {
 };
 
 function ts() {
-  return chalk.gray(`[${new Date().toLocaleTimeString("es-CO", { hour12: false })}]`);
+  return new Date().toLocaleTimeString("es-CO", { hour12: true });
 }
 
 export const log = {
-  info:  (msg) => console.log(`${ts()} ${tag.info}  ${chalk.white(msg)}`),
-  ok:    (msg) => console.log(`${ts()} ${tag.ok}  ${chalk.greenBright(msg)}`),
-  warn:  (msg) => console.log(`${ts()} ${tag.warn}  ${chalk.yellow(msg)}`),
-  error: (msg) => console.log(`${ts()} ${tag.error}  ${chalk.red(msg)}`),
-  conn:  (msg) => console.log(`${ts()} ${tag.conn}  ${chalk.cyan(msg)}`),
-  bot:   (msg) => console.log(`${ts()} ${tag.bot}  ${chalk.hex("#B0BEC5")(msg)}`),
+  info:  (msg) => console.log(`${chalk.gray(`[${ts()}]`)} ${tag.info}  ${chalk.white(msg)}`),
+  ok:    (msg) => console.log(`${chalk.gray(`[${ts()}]`)} ${tag.ok}  ${chalk.greenBright(msg)}`),
+  warn:  (msg) => console.log(`${chalk.gray(`[${ts()}]`)} ${tag.warn}  ${chalk.yellow(msg)}`),
+  error: (msg) => console.log(`${chalk.gray(`[${ts()}]`)} ${tag.error}  ${chalk.red(msg)}`),
+  conn:  (msg) => console.log(`${chalk.gray(`[${ts()}]`)} ${tag.conn}  ${chalk.cyan(msg)}`),
+  bot:   (msg) => console.log(`${chalk.gray(`[${ts()}]`)} ${tag.bot}  ${chalk.hex("#B0BEC5")(msg)}`),
 
   message({ from, sender, isGroup, groupName, body, isCmd, cmdName, botLabel = "MAIN" }) {
-    const botTag    = chalk.bgHex("#263238").white.bold(` ${botLabel} `)
-    const lugarTag  = isGroup
-      ? chalk.bgHex("#7B2FBE").white.bold(" GRUPO ")
-      : chalk.bgHex("#1A237E").white.bold("  DM   ")
-    const numero    = chalk.hex("#00E5FF").bold(sender.split("@")[0].split(":")[0])
-    const lugar     = isGroup ? chalk.hex("#E040FB")(`${groupName}`) : chalk.hex("#00E5FF")("Privado")
-    const contenido = isCmd
-      ? `${tag.cmd} ${chalk.hex("#E040FB").bold(cmdName)} ${chalk.gray("→")} ${chalk.white(body)}`
-      : `${tag.msg} ${chalk.gray(body?.slice(0, 60))}${body?.length > 60 ? "…" : ""}`
+    const chatType = isGroup ? "👥 Grupo" : "💬 Privado"
+    const numero   = sender.split("@")[0].split(":")[0]
+    const lugar    = isGroup ? groupName : "Chat Privado"
+
+    let msgType = "Texto"
+    if (isCmd) msgType = "⚡ Comando"
 
     console.log(
-      `${ts()} ${botTag} ${lugarTag} ` +
-      `${chalk.gray("Bot:")} ${botTag} ` +
-      `${chalk.gray("Grupo:")} ${lugar} ` +
-      `${chalk.gray("Número:")} ${numero}\n` +
-      `         ${contenido}`
-    );
+      chalk.hex("#7B2FBE")("═".repeat(55)) + "\n" +
+      chalk.bgHex("#7B2FBE").white(` ⏰ ${ts()} `) +
+      chalk.hex("#7B2FBE")(" │ ") +
+      chalk.bgHex("#E040FB").white(` 🤖 ${botLabel} `) + "\n" +
+      chalk.hex("#7B2FBE")("─".repeat(55)) + "\n" +
+      chalk.white("📱 Usuario  : ") + chalk.greenBright(`+${numero}`) + "\n" +
+      chalk.white(`${chatType}  : `) + chalk.yellowBright(lugar) + "\n" +
+      chalk.white("📝 Tipo     : ") + chalk.blueBright(msgType) + "\n" +
+      chalk.white("💬 Mensaje  : ") + (isCmd
+        ? chalk.hex("#E040FB")(`⚡ ${body}`)
+        : chalk.white(body?.slice(0, 80) + (body?.length > 80 ? "…" : ""))) + "\n" +
+      chalk.hex("#7B2FBE")("─".repeat(55))
+    )
   },
 
   cmdExec({ cmdName, sender, success, ms, botLabel = "MAIN" }) {
-    const botTag = chalk.bgHex("#263238").white.bold(` ${botLabel} `)
     const status = success
       ? chalk.greenBright("✔ Ejecutado")
       : chalk.red("✘ Fallido")
     console.log(
-      `${ts()} ${botTag} ${tag.cmd}  ${chalk.hex("#E040FB").bold(cmdName)} ` +
-      `${chalk.gray("por")} ${chalk.cyan(sender)} ` +
-      `${status} ${chalk.gray(`(${ms}ms)`)}`
-    );
+      chalk.gray(`[${ts()}]`) + " " +
+      chalk.bgHex("#263238").white.bold(` ${botLabel} `) + " " +
+      tag.cmd + "  " +
+      chalk.hex("#E040FB").bold(cmdName) + " " +
+      chalk.gray("por") + " " +
+      chalk.cyan(sender) + " " +
+      status + " " +
+      chalk.gray(`(${ms}ms)`)
+    )
   },
 };
