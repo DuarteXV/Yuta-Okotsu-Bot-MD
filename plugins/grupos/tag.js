@@ -1,6 +1,6 @@
 export default {
   name: ["tag", "tagall"],
-  description: "Repite textos, stickers o multimedia con mención invisible y sin cartel de reenviado",
+  description: "Repite el mensaje de forma nativa con mención invisible a todo el grupo",
   groupOnly: true,
   adminOnly: true,
 
@@ -11,54 +11,60 @@ export default {
     const members = groupMeta?.participants || [];
     const mentions = members.map(m => m.id);
 
-    // Configuración obligatoria para activar las notificaciones silenciosas
-    const contextInfo = { 
-      mentions,
-      mentionedJid: mentions 
-    };
-
     // 2. Detectar si estás respondiendo a un mensaje (quoted)
     const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || 
                       msg.message?.ephemeralMessage?.message?.extendedTextMessage?.contextInfo?.quotedMessage;
 
     try {
       if (quotedMsg) {
-        // --- CASO A: Respondiendo a un mensaje (Texto, Sticker, Foto, etc.) ---
-        const messageType = Object.keys(quotedMsg)[0];
+        // --- CASO A: Respondiendo a cualquier mensaje (Texto, Sticker, Foto, etc.) ---
         
-        let messageToSend = {};
+        // Clonamos el mensaje citado para no alterar el original
+        const messageContent = JSON.parse(JSON.stringify(quotedMsg));
+        const messageType = Object.keys(messageContent)[0];
 
-        if (messageType === 'conversation' || messageType === 'extendedTextMessage') {
-          // Si es texto plano
-          const textoOriginal = quotedMsg.conversation || quotedMsg.extendedTextMessage?.text;
-          messageToSend = { 
-            text: text || textoOriginal || "📢", 
-            contextInfo 
-          };
-        } else {
-          // Si es un Sticker, Imagen, Video, Audio, Documento, etc.
-          // Pasamos el objeto del tipo de mensaje tal cual viene de WhatsApp para no romper sus buffers
-          messageToSend = {
-            [messageType]: quotedMsg[messageType],
-            contextInfo
-          };
-
-          // Si el usuario escribió un texto junto al comando (.tag hola) y el formato admite subtítulo
-          if (text && messageToSend[messageType] && 'caption' in messageToSend[messageType]) {
-            messageToSend[messageType].caption = text;
+        // Si escribiste texto junto al comando (.tag hola), se lo aplicamos si es posible
+        if (text) {
+          if (messageType === 'conversation') {
+            messageContent.conversation = text;
+          } else if (messageType === 'extendedTextMessage') {
+            messageContent.extendedTextMessage.text = text;
+          } else if (messageContent[messageType]?.caption !== undefined) {
+            messageContent[messageType].caption = text;
           }
         }
 
-        // Enviamos el mensaje clonado de forma limpia (sin usar forward)
-        await sock.sendMessage(from, messageToSend);
+        // Forzamos a que el contextInfo elimine cualquier rastro de reenvío e incluya las menciones
+        const limpioContextInfo = {
+          mentions,
+          mentionedJid: mentions,
+          isForwarded: false // <-- Esto le quita la etiqueta de "Reenviado" en la mayoría de versiones de Baileys
+        };
+
+        // Si el contenido ya tiene un contextInfo interno, lo fusionamos, si no, lo creamos
+        if (messageContent[messageType] && typeof messageContent[messageType] === 'object') {
+          messageContent[messageType].contextInfo = {
+            ...messageContent[messageType].contextInfo,
+            ...limpioContextInfo
+          };
+        }
+
+        // Enviamos el mensaje clonado usando el sistema de reenvío limpio de Baileys
+        await sock.sendMessage(from, {
+          forward: {
+            key: msg.key,
+            message: messageContent
+          },
+          contextInfo: limpioContextInfo
+        }, { quoted: msg });
 
       } else {
-        // --- CASO B: Mensaje directo en el chat (.tag Hola a todos) ---
+        // --- CASO B: Mensaje directo sin responder (.tag Hola a todos) ---
         const textoEnviar = text || "📢 ¡Atención a todos!";
         
         await sock.sendMessage(from, {  
           text: textoEnviar,  
-          contextInfo
+          contextInfo: { mentions, mentionedJid: mentions }
         });
       }
 
