@@ -1,63 +1,63 @@
 export default {
   name: ["tag", "tagall"],
-  description: "Menciona a todos en el grupo de forma limpia (oculta), soportando textos y contenido citado",
+  description: "Repite el mensaje (texto o multimedia) con mención invisible a todos sin etiqueta de reenviado",
   groupOnly: true,
   adminOnly: true,
 
   async run({ sock, from, msg, groupMeta, text, reply, react }) {
     await react('📢');
 
-    // 1. Obtener todos los miembros para la mención fantasma
+    // 1. Obtener la lista de miembros para la mención invisible
     const members = groupMeta?.participants || [];
     const mentions = members.map(m => m.id);
 
-    // 2. Detectar si el usuario está respondiendo a un mensaje (quoted)
+    // 2. Detectar si estás respondiendo a alguien (quoted)
     const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || 
                       msg.message?.ephemeralMessage?.message?.extendedTextMessage?.contextInfo?.quotedMessage;
 
     try {
       if (quotedMsg) {
-        // --- CASO A: El usuario respondió a un mensaje (Texto, Foto, Sticker, etc.) ---
-        
-        // Creamos una copia del mensaje citado para reenviarlo con la mención oculta
-        const messageContent = JSON.parse(JSON.stringify(quotedMsg));
-        const messageType = Object.keys(messageContent)[0];
+        // --- CASO A: Respondiste a un mensaje (texto, foto, sticker, etc.) ---
+        // Extraemos el tipo de mensaje original
+        const messageType = Object.keys(quotedMsg)[0];
+        const content = quotedMsg[messageType];
 
-        // Si el mensaje citado tiene un texto/caption original, se lo dejamos. Si el usuario escribió algo junto al .tag, se lo ponemos de texto principal.
-        if (text) {
-          if (messageType === 'conversation') {
-            messageContent.conversation = text;
-          } else if (messageType === 'extendedTextMessage') {
-            messageContent.extendedTextMessage.text = text;
-          } else if (messageContent[messageType]?.caption !== undefined) {
-            messageContent[messageType].caption = text;
+        // Construimos un objeto de mensaje limpio (sin propiedades de reenvío)
+        let messageToSend = {};
+
+        if (messageType === 'conversation' || messageType === 'extendedTextMessage') {
+          // Si el mensaje citado es texto, el bot lo repite como texto limpio
+          messageToSend = { text: content.text || content || text || "📢" };
+        } else {
+          // Si es multimedia (imageMessage, stickerMessage, videoMessage, etc.)
+          // Copiamos el archivo (media key, url, etc.) para que se mande idéntico
+          messageToSend = { [messageType]: content };
+          
+          // Si el usuario escribió un texto extra junto al comando (ej: .tag mira esto), se lo ponemos como comentario (caption)
+          if (text && messageToSend[messageType].hasOwnProperty('caption')) {
+            messageToSend[messageType].caption = text;
           }
         }
 
-        // Enviamos el contenido citado clonado con las menciones ocultas
-        await sock.sendMessage(from, {
-          forward: {
-            key: msg.key, // Mantiene el contexto si es necesario
-            message: messageContent
-          },
-          contextInfo: { mentions }
-        }, { quoted: msg });
+        // Agregamos la mención invisible en el contexto
+        messageToSend.contextInfo = { mentions };
+
+        // Enviamos el mensaje de forma nativa (sin usar la propiedad 'forward')
+        await sock.sendMessage(from, messageToSend);
 
       } else {
-        // --- CASO B: Uso simple (.tag [mensaje]) ---
-        // Si no escribe nada después de .tag, usamos el aviso por defecto
+        // --- CASO B: Pusiste .tag [mensaje] directamente en el chat ---
         const textoEnviar = text || "📢 ¡Atención a todos!";
 
         await sock.sendMessage(from, {  
           text: textoEnviar,  
-          contextInfo: { mentions } // Las menciones van aquí dentro para que sean "invisibles" en el texto
-        }, { quoted: msg });
+          contextInfo: { mentions }
+        });
       }
 
       await react('✅');
     } catch (error) {
       console.error("Error en el comando tag:", error);
-      await reply("❌ Hubo un error al intentar hacer el tag.");
       await react('❌');
     }
   }
