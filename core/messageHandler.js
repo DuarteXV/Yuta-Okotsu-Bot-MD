@@ -95,14 +95,19 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN") {
     // ─── ADMIN USUARIO ──────────────────────────────────
     let isAdmin = false;
     if (isGroup && groupMeta?.participants) {
-      const participant = groupMeta.participants.find(p => cleanJid(p.id) === sender);
+      const participant = groupMeta.participants.find(p =>
+        p.id.split(":")[0].split("@")[0] === senderNum
+      );
       isAdmin = participant?.admin === "admin" || participant?.admin === "superadmin";
     }
 
     // ─── ADMIN BOT ──────────────────────────────────────
     let isBotAdmin = false;
     if (isGroup && groupMeta?.participants) {
-      const botParticipant = groupMeta.participants.find(p => cleanJid(p.id) === botJid);
+      const botNum = botJid.split("@")[0]
+      const botParticipant = groupMeta.participants.find(p =>
+        p.id.split(":")[0].split("@")[0] === botNum
+      );
       isBotAdmin = botParticipant?.admin === "admin" || botParticipant?.admin === "superadmin";
     }
 
