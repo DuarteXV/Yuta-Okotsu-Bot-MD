@@ -20,17 +20,15 @@ const catIcons = {
   "media":      "💫",
   "util":       "🪽",
   "downloader": "🪐",
-} 
+}
 
 export default {
   name: ["menu", "help", "ayuda"],
   description: "Muestra el menú.",
   ownerOnly: false,
 
-  async run({ sock, from, senderNum, isGroup, groupName, usedPrefix, react, msg }) {
+  async run({ sock, from, senderNum, isGroup, groupName, usedPrefix, msg }) {
     try {
-      await react("⛩️");
-
       const hora  = new Date().toLocaleTimeString("es-CO", { hour12: false });
       const fecha = new Date().toLocaleDateString("es-CO");
       const lugar = isGroup ? groupName : "Chat Privado";
@@ -66,7 +64,7 @@ export default {
         const categoriaLimped = cat.toLowerCase().trim();
         const icon = catIcons[categoriaLimped] || "🎴";
         const nombreFormateado = categoriaLimped.charAt(0).toUpperCase() + categoriaLimped.slice(1);
-        
+
         textoMenu += `${icon} ─── ❖ *꒰ ${nombreFormateado} ꒱* ❖ ─── ${icon}\n`;
         for (const cmd of cmds) {
           textoMenu += `✦ ${usedPrefix}${cmd}\n`;
