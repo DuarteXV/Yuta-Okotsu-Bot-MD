@@ -15,10 +15,6 @@ export default {
     target = `${targetNum}@s.whatsapp.net`
 
     try {
-      const hora  = new Date().toLocaleTimeString('es-CO', { hour12: false })
-      const fecha = new Date().toLocaleDateString('es-CO')
-
-      // ─── OBTENER INFO EN PARALELO ────────────────────
       const [status, foto, biz, devices] = await Promise.allSettled([
         sock.fetchStatus(target),
         sock.profilePictureUrl(target, 'image'),
@@ -30,20 +26,16 @@ export default {
         ? status.value?.status || 'Sin estado'
         : 'No disponible'
 
-      const tieneFoto = foto.status === 'fulfilled' && foto.value
-
-      const bizData   = biz.status === 'fulfilled' && biz.value
+      const tieneFoto  = foto.status === 'fulfilled' && foto.value
+      const bizData    = biz.status === 'fulfilled' && biz.value
       const esBusiness = bizData && Object.keys(bizData).length > 0
 
-      // ─── DISPOSITIVOS ────────────────────────────────
       let dispositivosTxt = 'No disponible'
       if (devices.status === 'fulfilled' && devices.value) {
         const devList = devices.value
-        if (devList.length > 0) {
-          dispositivosTxt = `${devList.length} dispositivo(s) vinculado(s)`
-        } else {
-          dispositivosTxt = 'Sin dispositivos vinculados'
-        }
+        dispositivosTxt = devList.length > 0
+          ? `${devList.length} dispositivo(s) vinculado(s)`
+          : 'Sin dispositivos vinculados'
       }
 
       let text = `✨ ═══ 🫧 *YUTA OKOTSU* 🫧 ═══ ✨\n`
@@ -67,7 +59,6 @@ export default {
         text += '\n'
       }
 
-      text += `_${hora} • ${fecha}_\n`
       text += `⚔️ _Yuta Okotsu MD | DuarteXV_`
 
       if (tieneFoto) {
