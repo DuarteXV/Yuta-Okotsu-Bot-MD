@@ -1,7 +1,8 @@
 import { downloadMediaMessage } from '@whiskeysockets/baileys'
 import axios from 'axios'
+import { FormData, Blob } from 'formdata-node'
 
-const CDN_URL = 'https://cdn.adoolab.xyz'
+const CDN_URL = 'https://cdn.dix.lat'
 
 const MEDIA_TYPES = {
   imageMessage:    { ext: 'jpg',  mime: 'image/jpeg' },
@@ -13,15 +14,18 @@ const MEDIA_TYPES = {
 }
 
 async function subirCDN(buffer, filename, mimetype, expiration = 'never') {
-  const blob = new Blob([buffer], { type: mimetype })
   const form = new FormData()
+  const blob = new Blob([buffer], { type: mimetype })
+  
+  const uploadPath = expiration === 'never' ? '/upload' : `/upload?ttl=${expiration}`
+  
   form.append('file', blob, filename)
-  form.append('expiration', expiration)
 
-  const res = await axios.post(`${CDN_URL}/api/upload`, form, {
+  const res = await axios.post(`${CDN_URL}${uploadPath}`, form, {
     timeout: 120000,
     maxContentLength: Infinity,
-    maxBodyLength: Infinity
+    maxBodyLength: Infinity,
+    headers: { 'User-Agent': 'Drive-Client' }
   })
 
   return res.data
@@ -100,7 +104,7 @@ export default {
 
       const resultado = await subirCDN(buffer, filename, mediaInfo.mime, expiration)
 
-      const url = resultado?.url || resultado?.data?.url || resultado?.file?.url
+      const url = resultado?.data?.url || resultado?.url 
 
       if (!url) throw new Error('No se obtuvo URL del CDN')
 
