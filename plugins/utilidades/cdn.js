@@ -29,7 +29,6 @@ async function subirDix(buffer, filename, mimetype) {
     filename
   )
 
-  // Separación correcta de endpoints según el tipo de archivo
   const endpoint = mimetype.startsWith('image/')
     ? `${API_URL}/upload1`
     : `${API_URL}/upload2`
@@ -52,7 +51,7 @@ async function subirDix(buffer, filename, mimetype) {
 
 export default {
   name: ['cdn', 'subir', 'upload'],
-  description: 'Sube archivos multimedia al CDN de Dix',
+  description: 'Sube archivos al CDN de Dix usando la ruta /me/',
   category: 'misc',
   ownerOnly: false,
 
@@ -60,7 +59,6 @@ export default {
     try {
       await react('⏳')
 
-      // 1. Extraer el mensaje base (manejando mensajes efímeros)
       let rawMessage = msg.message
       if (rawMessage?.ephemeralMessage) {
         rawMessage = rawMessage.ephemeralMessage.message
@@ -68,7 +66,6 @@ export default {
 
       const msgType = getContentType(rawMessage)
 
-      // 2. Extraer el mensaje citado si existe (manejando mensajes efímeros)
       const quotedContext = rawMessage?.extendedTextMessage?.contextInfo
       let quotedMessage = quotedContext?.quotedMessage
       if (quotedMessage?.ephemeralMessage) {
@@ -105,7 +102,6 @@ export default {
         })
       }
 
-      // Descargar el archivo desde los servidores de WhatsApp
       const buffer = await downloadMediaMessage(
         targetMsg,
         'buffer',
@@ -122,18 +118,19 @@ export default {
       const mime = detected?.mime || mediaInfo.mime
       const filename = `file_${Date.now()}.${ext}`
 
-      // Realizar la petición a la API
       const result = await subirDix(buffer, filename, mime)
 
-      // Validación basada estrictamente en el formato de tu respuesta confirmada
       if (!result || !result.status || !result.data) {
         throw new Error('El servidor de Dix rechazó la subida o devolvió un formato incorrecto.')
       }
 
       const data = result.data
 
-      // Mapeo exacto de la URL devuelta por el backend del servidor
-      const finalUrl = data.url
+      // Reemplazamos /media/ por /me/ directamente en la URL que devuelve la API para corregir el error del servidor
+      let finalUrl = data.url || `https://api.dix.lat/me/${data.id || filename}`
+      if (finalUrl.includes('/media/')) {
+        finalUrl = finalUrl.replace('/media/', '/me/')
+      }
 
       await reply({
         text:
