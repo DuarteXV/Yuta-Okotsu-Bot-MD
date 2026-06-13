@@ -31,7 +31,7 @@ async function subirDix(buffer, filename, mimetype) {
     filename
   )
 
-  const endpoint = mimetype.startsWith('image/')
+  const endpoint = mimetype.startsWith('image/') && !mimetype.includes('webp')
     ? `${API_URL}/upload1`
     : `${API_URL}/upload2`
 
@@ -53,7 +53,7 @@ async function subirDix(buffer, filename, mimetype) {
 
 export default {
   name: ['cdn', 'subir', 'upload'],
-  description: 'Sube archivos a Dix de forma correcta',
+  description: 'Sube archivos a Dix con carpetas dinámicas',
   category: 'misc',
   ownerOnly: false,
 
@@ -81,12 +81,12 @@ export default {
       let targetMsg = null
       let mediaInfo = null
 
-      // Validar si el mensaje principal contiene la multimedia
+      // Validar si el mensaje principal contiene la multimedia admisible
       if (msgType && MEDIA_TYPES[msgType]) {
         targetMsg = msg
         mediaInfo = { type: msgType, ...MEDIA_TYPES[msgType] }
       } 
-      // Validar si el mensaje citado contiene la multimedia
+      // Validar si el mensaje citado contiene la multimedia admisible
       else if (quotedMessage && quotedType && MEDIA_TYPES[quotedType]) {
         targetMsg = {
           key: {
@@ -109,7 +109,7 @@ export default {
         })
       }
 
-      // Descarga del buffer
+      // Descarga del buffer desde los servidores de WhatsApp
       const buffer = await downloadMediaMessage(
         targetMsg,
         'buffer',
@@ -127,7 +127,7 @@ export default {
       const mime = detected?.mime || mediaInfo.mime
       const filename = `file_${Date.now()}.${ext}`
 
-      // Petición a la API externa
+      // Petición HTTP a la API externa
       const result = await subirDix(buffer, filename, mime)
 
       if (!result || !result.data) {
@@ -136,8 +136,12 @@ export default {
 
       const data = result.data
 
+      // Detectar la subruta correcta de la API:
+      // Las imágenes estándar van a /media/, los stickers (webp) y demás archivos van a /upload/
+      const folder = (mime.startsWith('image/') && !mime.includes('webp')) ? 'media' : 'upload'
+
       // Construcción inteligente de la URL usando los datos reales de la API
-      const finalUrl = data.url || result.url || data.link || `https://api.dix.lat/media/${data.id || filename}`
+      const finalUrl = data.url || result.url || data.link || `https://api.dix.lat/${folder}/${data.id || filename}`
 
       await reply({
         text:
