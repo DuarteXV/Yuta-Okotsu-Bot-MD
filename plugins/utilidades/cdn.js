@@ -1,9 +1,9 @@
 import { downloadMediaMessage } from '@whiskeysockets/baileys'
 import axios from 'axios'
-import { FormData, Blob } from 'formdata-node'
+import { FormData } from 'formdata-node'
 import { fileTypeFromBuffer } from 'file-type'
 
-const API_URL = 'https://api.dix.lat'
+const API_URL = 'https://cdn.dix.lat'
 
 const MEDIA_TYPES = {
   imageMessage:    { ext: 'jpg',  mime: 'image/jpeg' },
@@ -20,18 +20,17 @@ function getContentType(message) {
   return keys.find(key => key !== 'messageContextInfo' && key !== 'senderKeyDistributionMessage')
 }
 
-async function subirDix(buffer, filename, mimetype) {
+async function subirDix(buffer, filename, mimetype, esTemporal = false, ttl = 86400) {
   const form = new FormData()
 
-  form.append(
-    'file',
-    new Blob([buffer], { type: mimetype }),
-    filename
-  )
+  form.append('file', buffer, {
+    filename: filename,
+    contentType: mimetype
+  })
 
-  const endpoint = mimetype.startsWith('image/')
-    ? `${API_URL}/upload1`
-    : `${API_URL}/upload2`
+  const endpoint = esTemporal 
+    ? `${API_URL}/upload/tmp?ttl=${ttl}`
+    : `${API_URL}/upload`
 
   const { data } = await axios.post(
     endpoint,
@@ -50,14 +49,23 @@ async function subirDix(buffer, filename, mimetype) {
 }
 
 export default {
-  name: ['cdn', 'subir', 'upload'],
-  description: 'Sube archivos al CDN de Dix usando la ruta /me/',
+  name: ['cdn', 'subir', 'upload', 'tmp'],
+  description: 'Sube archivos de forma permanente o temporal al CDN de Dix',
   category: 'misc',
   ownerOnly: false,
 
-  async run({ sock, from, msg, react, reply }) {
+  async run({ sock, from, msg, react, reply, args }) {
     try {
       await react('⏳')
+
+      const cmdUsado = msg.body?.trim()?.split(/\s+/)[0]?.toLowerCase() || ''
+      const esTemporal = cmdUsado.includes('tmp') || args?.includes('--tmp') || args?.includes('-t')
+
+      let ttlValue = 86400
+      if (esTemporal && args) {
+        const ttlArg = args.find(arg => !isNaN(arg) && parseInt(arg) >= 60 && parseInt(arg) <= 172800)
+        if (ttlArg) ttlValue = parseInt(ttlArg)
+      }
 
       let rawMessage = msg.message
       if (rawMessage?.ephemeralMessage) {
@@ -118,7 +126,7 @@ export default {
       const mime = detected?.mime || mediaInfo.mime
       const filename = `file_${Date.now()}.${ext}`
 
-      const result = await subirDix(buffer, filename, mime)
+      const result = await subirDix(buffer, filename, mime, esTemporal, ttlValue)
 
       if (!result || !result.status || !result.data) {
         throw new Error('El servidor de Dix rechazó la subida o devolvió un formato incorrecto.')
@@ -126,22 +134,19 @@ export default {
 
       const data = result.data
 
-      // Reemplazamos /media/ por /me/ directamente en la URL que devuelve la API para corregir el error del servidor
-      let finalUrl = data.url || `https://api.dix.lat/me/${data.id || filename}`
-      if (finalUrl.includes('/media/')) {
-        finalUrl = finalUrl.replace('/media/', '/me/')
+      let textoRespuesta = `✅ *Archivo subido con éxito (${esTemporal ? 'Temporal' : 'Permanente'})*\n\n` +
+        `📄 *Nombre:* \`${filename}\`\n` +
+        `🆔 *Public ID:* \`${data.public_id || '-'}\`\n` +
+        `📦 *Mime:* \`${mime}\`\n`
+
+      if (esTemporal && data.expires) {
+        const fechaExpira = new Date(data.expires * 1000).toLocaleString()
+        textoRespuesta += `⏳ *Expira:* \`${fechaExpira}\`\n`
       }
 
-      await reply({
-        text:
-          `✅ *Archivo subido con éxito*\n\n` +
-          `📄 *Nombre:* \`${filename}\`\n` +
-          `🆔 *ID:* \`${data.id || '-'}\`\n` +
-          `📏 *Tamaño:* \`${data.size || '-'}\`\n` +
-          `📦 *Mime:* \`${data.mime || mime}\`\n\n` +
-          `🔗 *URL:*\n${finalUrl}`
-      })
+      textoRespuesta += `\n🔗 *URL:*\n${data.url}`
 
+      await reply({ text: textoRespuesta })
       await react('✅')
 
     } catch (e) {
