@@ -31,7 +31,8 @@ async function subirDix(buffer, filename, mimetype) {
     filename
   )
 
-  const endpoint = mimetype.startsWith('image/') && !mimetype.includes('webp')
+  // Volvemos a la lógica original exacta de subida que no daba error 500
+  const endpoint = mimetype.startsWith('image/')
     ? `${API_URL}/upload1`
     : `${API_URL}/upload2`
 
@@ -53,7 +54,7 @@ async function subirDix(buffer, filename, mimetype) {
 
 export default {
   name: ['cdn', 'subir', 'upload'],
-  description: 'Sube archivos a Dix con carpetas dinámicas',
+  description: 'Sube archivos a Dix de forma correcta',
   category: 'misc',
   ownerOnly: false,
 
@@ -136,11 +137,11 @@ export default {
 
       const data = result.data
 
-      // Detectar la subruta correcta de la API:
-      // Las imágenes estándar van a /media/, los stickers (webp) y demás archivos van a /upload/
+      // Corrección del enlace: Las imágenes normales (jpg, png) van a /media/
+      // Los stickers (webp) y demás archivos van a /upload/
       const folder = (mime.startsWith('image/') && !mime.includes('webp')) ? 'media' : 'upload'
 
-      // Construcción inteligente de la URL usando los datos reales de la API
+      // Construcción de la URL
       const finalUrl = data.url || result.url || data.link || `https://api.dix.lat/${folder}/${data.id || filename}`
 
       await reply({
