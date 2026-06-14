@@ -13,33 +13,55 @@ import { loadPlugins } from "./pluginLoader.js";
 const { id, sessionDir, phoneNumber } = workerData;
 const logger = pino({ level: "silent" });
 
+let pluginsLoaded = false;
+
 async function startWorker(_attempt = 0) {
   await mkdir(sessionDir, { recursive: true });
-  await loadPlugins();
+
+  if (!pluginsLoaded) {
+    await loadPlugins();
+    pluginsLoaded = true;
+  }
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
   const { version } = await fetchLatestBaileysVersion();
 
   const useCode = !!phoneNumber && !state.creds.registered;
 
-  const sock = makeWASocket({
-    version,
-    auth: {
-      creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, logger),
-    },
-    printQRInTerminal: false,
-    logger,
-    browser: ["MacOs", "Safari"],
-    syncFullHistory: false,
-    markOnlineOnConnect: false,
-    generateHighQualityLinkPreview: false,
-    getMessage: async () => undefined,
-    connectTimeoutMs: 30000,
-    keepAliveIntervalMs: 55000,
-    retryRequestDelayMs: 2000,
-    defaultQueryTimeoutMs: undefined,
-  });
+  let sock;
+  let connected = false;
+  let pendingMessages = [];
+
+  async function flushPending() {
+    const queue = pendingMessages.splice(0);
+    for (const msg of queue) {
+      handleMessage(sock, msg, id.toUpperCase()).catch(() => {});
+    }
+  }
+
+  try {
+    sock = makeWASocket({
+      version,
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, logger),
+      },
+      printQRInTerminal: false,
+      logger,
+      browser: ["Ubuntu", "Chrome", "20.0.04"],
+      syncFullHistory: false,
+      markOnlineOnConnect: false,
+      generateHighQualityLinkPreview: false,
+      connectTimeoutMs: 60000,
+      keepAliveIntervalMs: 25000,
+      retryRequestDelayMs: 3000,
+      defaultQueryTimeoutMs: 60000,
+    });
+  } catch (e) {
+    parentPort?.postMessage({ type: "error", message: e.message });
+    if (_attempt < 10) setTimeout(() => startWorker(_attempt + 1), 5000);
+    return;
+  }
 
   // ─── PEDIR CÓDIGO ──────────────────────────────────────
   if (useCode) {
@@ -55,14 +77,17 @@ async function startWorker(_attempt = 0) {
 
   sock.ev.on("connection.update", async ({ connection, lastDisconnect }) => {
     if (connection === "open") {
+      connected = true;
       parentPort.postMessage({
         type: "status",
         status: "online",
         jid: sock.user?.id || "",
       });
+      await flushPending();
     }
 
     if (connection === "close") {
+      connected = false;
       const statusCode = lastDisconnect?.error?.output?.statusCode;
 
       parentPort.postMessage({ type: "status", status: "offline", jid: "" });
@@ -78,7 +103,6 @@ async function startWorker(_attempt = 0) {
         return;
       }
 
-      // Reconectar
       setTimeout(() => startWorker(_attempt + 1), 5000);
     }
   });
@@ -90,6 +114,10 @@ async function startWorker(_attempt = 0) {
     for (const msg of messages) {
       if (!msg.message) continue;
       if (msg.key?.remoteJid === "status@broadcast") continue;
+      if (!connected) {
+        pendingMessages.push(msg);
+        return;
+      }
       handleMessage(sock, msg, id.toUpperCase()).catch(() => {});
     }
   });
