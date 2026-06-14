@@ -120,8 +120,6 @@ export async function createConnection({
       syncFullHistory: false,
       markOnlineOnConnect: false,
       generateHighQualityLinkPreview: true,
-      emitOwnEvents: false,
-      fireInitQueries: false,
       connectTimeoutMs: 60000,
       keepAliveIntervalMs: 25000,
       retryRequestDelayMs: 3000,
