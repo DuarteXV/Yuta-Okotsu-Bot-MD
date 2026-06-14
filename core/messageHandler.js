@@ -146,14 +146,21 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN") {
       reply: async (content) => {
         try {
           return await sock.sendMessage(from, content, { quoted: msg });
-        } catch {
-          return await sock.sendMessage(from, content);
+        } catch (e1) {
+          log.warn(`[${botLabel}] reply con quoted falló (${e1.message}), reintentando sin quoted...`);
+          try {
+            return await sock.sendMessage(from, content);
+          } catch (e2) {
+            log.error(`[${botLabel}] reply sin quoted también falló: ${e2.message} | from: ${from}`);
+          }
         }
       },
       react: async (emoji) => {
         try {
           return await sock.sendMessage(from, { react: { text: emoji, key: msg.key } });
-        } catch {}
+        } catch (e) {
+          log.warn(`[${botLabel}] react falló: ${e.message} | from: ${from}`);
+        }
       },
     };
 
