@@ -144,8 +144,9 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN") {
       isAdmin,
       isBotAdmin,
       reply: async (content) => {
+        if (typeof content === 'string') content = { text: content };
+        if (content.text !== undefined) content.mentions = [sender];
         try {
-          if (!isGroup) await sock.presenceSubscribe(from).catch(() => {});
           return await sock.sendMessage(from, content, { quoted: msg });
         } catch (e1) {
           log.warn(`[${botLabel}] reply con quoted falló (${e1.message}), reintentando sin quoted...`);
