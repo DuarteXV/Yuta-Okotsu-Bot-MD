@@ -97,6 +97,15 @@ export async function createConnection({
   }
 
   let sock;
+  let connectionTimeout;
+  let connected = false;
+
+  function clearConnTimeout() {
+    if (connectionTimeout) {
+      clearTimeout(connectionTimeout);
+      connectionTimeout = null;
+    }
+  }
 
   try {
     sock = makeWASocket({
@@ -107,15 +116,16 @@ export async function createConnection({
       },
       printQRInTerminal: !useCode,
       logger: pino({ level: "silent" }),
-      browser: ["MacOs", "Safari"],
+      browser: ["Ubuntu", "Chrome", "20.0.04"],
       syncFullHistory: false,
       markOnlineOnConnect: false,
       generateHighQualityLinkPreview: true,
-      getMessage: async () => undefined,
-      connectTimeoutMs: 30000,
-      keepAliveIntervalMs: 55000,
-      retryRequestDelayMs: 2000,
-      defaultQueryTimeoutMs: undefined,
+      emitOwnEvents: false,
+      fireInitQueries: false,
+      connectTimeoutMs: 60000,
+      keepAliveIntervalMs: 25000,
+      retryRequestDelayMs: 3000,
+      defaultQueryTimeoutMs: 60000,
     });
   } catch (e) {
     log.error(`[${botLabel}] Error al crear socket: ${e.message}`);
@@ -128,7 +138,7 @@ export async function createConnection({
   if (useCode && !state.creds.registered) {
     await new Promise((r) => setTimeout(r, 3000));
     try {
-      let code = await sock.requestPairingCode(phone, 'GITHUBUG');
+      let code = await sock.requestPairingCode(phone, "GITHUBUG");
       code = code?.match(/.{1,4}/g)?.join("-") || code;
       console.log(
         `\n  ┌─────────────────────────────┐\n` +
@@ -140,23 +150,31 @@ export async function createConnection({
     }
   }
 
-  let connectionTimeout = setTimeout(() => {
-    log.warn(`[${botLabel}] Timeout de conexión alcanzado, reconectando...`);
-    try { sock.end(new Error("timeout")); } catch {}
-  }, 60000);
+  connectionTimeout = setTimeout(() => {
+    if (!connected) {
+      log.warn(`[${botLabel}] Timeout de conexión alcanzado, reconectando...`);
+      try { sock.end(new Error("timeout")); } catch {}
+    }
+  }, 75000);
 
-  sock.ev.on("connection.update", async ({ connection, lastDisconnect }) => {
+  sock.ev.on("connection.update", async ({ connection, lastDisconnect, qr }) => {
+    if (qr) {
+      log.info(`[${botLabel}] QR listo para escanear`);
+    }
+
     if (connection === "connecting") {
       log.conn(`[${botLabel}] Conectando...`);
     }
 
     if (connection === "open") {
-      clearTimeout(connectionTimeout);
+      clearConnTimeout();
+      connected = true;
       log.ok(`[${botLabel}] ✅ Conectado → ${sock.user?.id}`);
     }
 
     if (connection === "close") {
-      clearTimeout(connectionTimeout);
+      clearConnTimeout();
+      connected = false;
 
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const errorMsg   = lastDisconnect?.error?.message || "Desconocido";
@@ -171,6 +189,11 @@ export async function createConnection({
       if (statusCode === DisconnectReason.connectionReplaced) {
         log.error(`[${botLabel}] Sesión reemplazada por otra instancia. Cerrando.`);
         return;
+      }
+
+      if (statusCode === DisconnectReason.badSession) {
+        log.error(`[${botLabel}] Sesión corrupta. Limpiando y reconectando...`);
+        await clearSocketFiles(sessionDir);
       }
 
       if (_attempt < config.maxReconnectAttempts) {
