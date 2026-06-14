@@ -99,11 +99,21 @@ export async function createConnection({
   let sock;
   let connectionTimeout;
   let connected = false;
+  let pendingMessages = [];
 
   function clearConnTimeout() {
     if (connectionTimeout) {
       clearTimeout(connectionTimeout);
       connectionTimeout = null;
+    }
+  }
+
+  async function flushPending() {
+    const queue = pendingMessages.splice(0);
+    for (const { msg, label } of queue) {
+      handleMessage(sock, msg, label).catch((e) =>
+        log.error(`[${label}] Error en mensaje: ${e.message}`)
+      );
     }
   }
 
@@ -168,6 +178,7 @@ export async function createConnection({
       clearConnTimeout();
       connected = true;
       log.ok(`[${botLabel}] ✅ Conectado → ${sock.user?.id}`);
+      await flushPending();
     }
 
     if (connection === "close") {
@@ -218,6 +229,10 @@ export async function createConnection({
     for (const msg of messages) {
       if (!msg.message) continue;
       if (msg.key?.remoteJid === "status@broadcast") continue;
+      if (!connected) {
+        pendingMessages.push({ msg, label: botLabel });
+        return;
+      }
       handleMessage(sock, msg, botLabel).catch((e) =>
         log.error(`[${botLabel}] Error en mensaje: ${e.message}`)
       );
