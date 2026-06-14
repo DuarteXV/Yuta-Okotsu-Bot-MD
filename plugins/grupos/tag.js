@@ -1,5 +1,5 @@
 export default {
-  name: ["tag", "tagall"],
+  name: ["tag"],
   description: "Repite el mensaje de forma nativa con mención invisible a todo el grupo",
   groupOnly: true,
   adminOnly: true,
