@@ -4,7 +4,7 @@ const LIMIT_MB = 80
 export default {
   name: ['play2'],
   description: 'Descarga video de YouTube',
-  category: 'downloader',
+  category: 'dl',
   ownerOnly: false,
 
   async run({ sock, from, msg, react, reply, text }) {
