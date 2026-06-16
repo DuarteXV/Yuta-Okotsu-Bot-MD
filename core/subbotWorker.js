@@ -1,12 +1,17 @@
 import { workerData, parentPort } from "worker_threads";
 import makeWASocket, {
-  useMultiFileAuthState,
   DisconnectReason,
   makeCacheableSignalKeyStore,
   fetchLatestBaileysVersion,
+  initAuthCreds,
+  BufferJSON,
+  proto,
 } from "@whiskeysockets/baileys";
 import pino from "pino";
 import { mkdir } from "fs/promises";
+import Database from "better-sqlite3";
+import path from "path";
+import fs from "fs";
 import { handleMessage } from "./messageHandler.js";
 import { loadPlugins } from "./pluginLoader.js";
 
@@ -14,6 +19,68 @@ const { id, sessionDir, phoneNumber } = workerData;
 const logger = pino({ level: "silent" });
 
 let pluginsLoaded = false;
+
+/**
+ * Proveedor de estado de autenticación SQLite exclusivo para el Worker.
+ * Crea y lee desde el archivo 'auth.db' en la ruta específica de la sesión.
+ */
+async function useSQLiteAuthState(sessionDir) {
+  if (!fs.existsSync(sessionDir)) {
+    fs.mkdirSync(sessionDir, { recursive: true });
+  }
+
+  const authDb = new Database(path.join(sessionDir, "auth.db"));
+  authDb.pragma("journal_mode = WAL");
+  authDb.exec(`CREATE TABLE IF NOT EXISTS auth (id TEXT PRIMARY KEY, data TEXT)`);
+
+  const readData = (id) => {
+    const row = authDb.prepare("SELECT data FROM auth WHERE id = ?").get(id);
+    return row ? JSON.parse(row.data, BufferJSON.reviver) : null;
+  };
+
+  const writeData = (data, id) => {
+    authDb
+      .prepare("INSERT OR REPLACE INTO auth (id, data) VALUES (?, ?)")
+      .run(id, JSON.stringify(data, BufferJSON.replacer));
+  };
+
+  const removeData = (id) => authDb.prepare("DELETE FROM auth WHERE id = ?").run(id);
+
+  let creds = readData("creds") || initAuthCreds();
+
+  return {
+    state: {
+      creds,
+      keys: {
+        get: async (type, ids) => {
+          const data = {};
+          ids.forEach((id) => {
+            let value = readData(`${type}-${id}`);
+            if (type === "app-state-sync-key" && value) {
+              value = proto.Message.AppStateSyncKeyData.fromObject(value);
+            }
+            data[id] = value;
+          });
+          return data;
+        },
+        set: async (data) => {
+          for (const cat in data) {
+            for (const id in data[cat]) {
+              const val = data[cat][id];
+              if (val) {
+                writeData(val, `${cat}-${id}`);
+              } else {
+                removeData(`${cat}-${id}`);
+              }
+            }
+          }
+        },
+      },
+    },
+    saveCreds: () => writeData(creds, "creds"),
+    closeDb: () => authDb.close(),
+  };
+}
 
 async function startWorker(_attempt = 0) {
   await mkdir(sessionDir, { recursive: true });
@@ -23,7 +90,8 @@ async function startWorker(_attempt = 0) {
     pluginsLoaded = true;
   }
 
-  const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+  // Inicialización del estado basado en SQLite en lugar de archivos JSON sueltos
+  const { state, saveCreds, closeDb } = await useSQLiteAuthState(sessionDir);
   const { version } = await fetchLatestBaileysVersion();
 
   const useCode = !!phoneNumber && !state.creds.registered;
@@ -58,6 +126,7 @@ async function startWorker(_attempt = 0) {
       defaultQueryTimeoutMs: 60000,
     });
   } catch (e) {
+    try { closeDb(); } catch {}
     parentPort?.postMessage({ type: "error", message: e.message });
     if (_attempt < 10) setTimeout(() => startWorker(_attempt + 1), 5000);
     return;
@@ -65,7 +134,7 @@ async function startWorker(_attempt = 0) {
 
   // ─── PEDIR CÓDIGO ──────────────────────────────────────
   if (useCode) {
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise((r) => setTimeout(r, 3000));
     try {
       let code = await sock.requestPairingCode(phoneNumber.replace(/\D/g, ""));
       code = code?.match(/.{1,4}/g)?.join("-") || code;
@@ -91,6 +160,9 @@ async function startWorker(_attempt = 0) {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
 
       parentPort.postMessage({ type: "status", status: "offline", jid: "" });
+
+      // Cerrar conexión de base de datos antes de salir del proceso del Worker
+      try { closeDb(); } catch {}
 
       if (statusCode === DisconnectReason.loggedOut) {
         parentPort.postMessage({ type: "logged_out" });
