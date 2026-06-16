@@ -23,6 +23,7 @@ export default {
 
     const user = db.getUser(senderNum)
 
+    // En SQLite, si no tiene configuración, text1 y text2 vienen como null
     if (user.text1 || user.text2) {
       return await reply({
         text: `⚠️ Ya tienes una marca establecida.\nUsa *.delmeta* para eliminarla primero.`
@@ -30,22 +31,27 @@ export default {
     }
 
     const texto = text.trim()
+    let packName = ''
+    let authorName = ''
 
     if (texto.includes('|')) {
       const [pack, author] = texto.split('|').map(v => v.trim())
-
-      user.text1 = pack || texto
-      user.text2 = author || texto
+      packName = pack || texto
+      authorName = author || texto
     } else {
-      user.text1 = texto
-      user.text2 = texto
+      packName = texto
+      authorName = texto
     }
+
+    // 🌟 AQUÍ ESTÁ EL CAMBIO: Guardar directamente en SQLite
+    db.setUser(senderNum, { text1: packName, text2: authorName });
 
     await reply({
       text:
         `✅ *Marca actualizada*\n\n` +
-        `📦 *Pack:* ${user.text1}\n` +
-        `✍️ *Autor:* ${user.text2}`
+        `📦 *Pack:* ${packName}\n` +
+        `✍️ *Autor:* ${authorName}`
     })
+    await react('✅')
   }
 }
