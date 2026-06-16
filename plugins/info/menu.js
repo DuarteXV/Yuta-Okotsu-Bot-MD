@@ -2,7 +2,6 @@ import axios from "axios";
 import { prepareWAMessageMedia, generateWAMessageFromContent } from "@whiskeysockets/baileys";
 import { getPlugins } from "../../core/pluginLoader.js";
 
-// ─── CACHÉ ───────────────────────────────────────────────
 let bannerCache    = null
 let bannerCacheTime = 0
 let mediaCache     = null
@@ -25,19 +24,20 @@ async function getBannerBuffer(url) {
 }
 
 const catIcons = {
-  "info":       "🌀",
-  "misc":       "💠",
-  "dl":         "☁",
-  "grupos":     "❄",
-  "owner":      "👑",
-  "media":      "💫",
-  "util":       "🪽",
-  "downloader": "🪐",
+  "info":     "🌀",
+  "misc":     "💠",
+  "dl":       "☁",
+  "grupos":   "❄",
+  "owner":    "👑",
+  "media":    "💫",
+  "stickers": "🪽",
+  "sockets":  "🪐",
 }
 
 export default {
   name: ["menu", "help", "ayuda"],
   description: "Muestra el menú.",
+  category: "info",
   ownerOnly: false,
 
   async run({ sock, from, senderNum, isGroup, groupName, usedPrefix, msg }) {
@@ -84,10 +84,9 @@ export default {
         textoMenu += "\n";
       }
 
-      textoMenu += `🪼 _⎯꯭♱𝆬       ְ𝐏𝐨𝐰𝐞𝐫𝐞𝐝 𝐛𝐲 𝐃𝐮𝐚𝐫𝐭𝐞𝐗𝐕 | 𝐘𝐮𝐭𝐚 𝐎𝐤𝐨𝐭𝐬𝐮 𝐌𝐃_ 🪼\n`;
+      textoMenu += `🪼 _⎯꯭♱𝆬       ְ𝐏𝐨𝐰𝐞𝐫𝐞𝐝 𝐛𝐲 𝐃𝐮𝐚𝐫𝐭𝓮𝐗𝐕 | 𝐘𝐮𝐭𝐚 𝐎𝐤𝐨𝐭𝐬𝐮 𝐌𝐃_ 🪼\n`;
       textoMenu += `🔗 ${linkMatch}`;
 
-      // ─── CACHÉ DE MEDIA ──────────────────────────────────
       let imgBanner
       if (mediaCache && Date.now() - mediaCacheTime < 3600000) {
         imgBanner = mediaCache
