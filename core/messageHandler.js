@@ -21,7 +21,6 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN") {
 
     if (!from) return;
     if (from === "status@broadcast") return;
-    if (msg.key?.fromMe) return;
 
     const isGroup   = from.endsWith("@g.us");
     const senderJid = isGroup
@@ -57,6 +56,9 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN") {
     const usedPrefix = prefixes.find((p) => body.startsWith(p)) ?? null;
     const isCmd      = !!usedPrefix;
 
+    // Si el mensaje es del propio bot pero NO es un comando, lo ignoramos para evitar bucles.
+    if (msg.key?.fromMe && !isCmd) return;
+
     const cmdName = isCmd ? body.slice(usedPrefix.length).trim().split(/\s+/)[0].toLowerCase() : "";
     const args    = isCmd ? body.slice(usedPrefix.length + cmdName.length).trim().split(/\s+/) : [];
     const text    = args.join(" ");
@@ -79,15 +81,16 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN") {
         }
       }
 
+      // Validamos el bot primario, PERO permitimos que todos escuchen si el comando es 'delprimary'
       const primaryBot = db.getPrimary(from);
-      if (primaryBot) {
+      if (primaryBot && cmdName !== "delprimary") {
         const myId = botJid.split("@")[0];
         if (primaryBot !== myId) return;
       }
     }
 
     const senderNum = sender.split("@")[0];
-    const isOwner   = config.ownerNumber.includes(senderNum);
+    const isOwner   = config.ownerNumber.includes(senderNum) || msg.key?.fromMe;
     const isCoOwner = config.coOwners.includes(senderNum);
     const isMod     = isOwner || isCoOwner || db.hasRole(senderNum, "mod");
     const isPremium = isMod   || db.hasRole(senderNum, "premium");
@@ -113,14 +116,6 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN") {
     const plugins = getPlugins();
     const plugin  = plugins.get(cmdName);
     if (!plugin) return;
-
-    if (plugin.ownerOnly   && !isOwner)                        return ctx.reply({ text: "❌ Solo el owner puede usar este comando." });
-    if (plugin.modOnly     && !isMod)                          return ctx.reply({ text: "❌ Solo moderadores pueden usar este comando." });
-    if (plugin.adminOnly   && isGroup && !isAdmin && !isOwner) return ctx.reply({ text: "❌ Solo admins del grupo pueden usar este comando." });
-    if (plugin.botAdmin    && isGroup && !isBotAdmin)          return ctx.reply({ text: "❌ El bot necesita ser admin del grupo." });
-    if (plugin.premiumOnly && !isPremium)                      return ctx.reply({ text: "⭐ Este comando es exclusivo para premium." });
-    if (plugin.groupOnly   && !isGroup)                        return ctx.reply({ text: "👥 Este comando solo funciona en grupos." });
-    if (plugin.privateOnly && isGroup)                         return ctx.reply({ text: "📩 Este comando solo funciona en privado." });
 
     const ctx = {
       sock,
@@ -167,6 +162,14 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN") {
         }
       },
     };
+
+    if (plugin.ownerOnly   && !isOwner)                return ctx.reply({ text: "❌ Solo el owner puede usar este comando." });
+    if (plugin.modOnly     && !isMod)                  return ctx.reply({ text: "❌ Solo moderadores pueden usar este comando." });
+    if (plugin.adminOnly   && isGroup && !isAdmin && !isOwner) return ctx.reply({ text: "❌ Solo admins del grupo pueden usar este comando." });
+    if (plugin.botAdmin    && isGroup && !isBotAdmin)          return ctx.reply({ text: "❌ El bot necesita ser admin del grupo." });
+    if (plugin.premiumOnly && !isPremium)                      return ctx.reply({ text: "⭐ Este comando es exclusivo para premium." });
+    if (plugin.groupOnly   && !isGroup)                        return ctx.reply({ text: "👥 Este comando solo funciona en grupos." });
+    if (plugin.privateOnly && isGroup)                         return ctx.reply({ text: "📩 Este comando solo funciona en privado." });
 
     const start = Date.now();
     try {
