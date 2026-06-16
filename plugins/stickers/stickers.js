@@ -152,7 +152,7 @@ async function limpiarSticker(buffer) {
 export default {
   name: ['s', 'sticker', 'stik'],
   description: 'Crea stickers desde imagen, video o sticker',
-  category: 'misc',
+  category: 'stickers',
   ownerOnly: false,
 
   async run({ sock, from, msg, senderNum, args, usedPrefix, react, reply }) {
