@@ -31,8 +31,8 @@ const catIcons = {
   "grupos":     "❄",
   "owner":      "👑",
   "media":      "💫",
-  "util":       "🪽",
-  "downloader": "🪐",
+  "stickers":       "🪽",
+  "sockets": "🪐",
 }
 
 export default {
