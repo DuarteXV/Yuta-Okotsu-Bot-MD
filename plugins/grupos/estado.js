@@ -94,7 +94,7 @@ const sendGroupStatus = async (sock, jid, options = {}) => {
 }
 
 export default {
-  name: ["estadogrupo", "gstatus", "statusgrupo"], // Ajustado al formato de array sin alias
+  name: ["estadogrupo", "gstatus", "statusgrupo"],
   category: 'owner',
   cooldown: 5,
   groupOnly: true,
@@ -103,37 +103,70 @@ export default {
   botAdmin: false,
   ownerOnly: true,
 
-  async run({ conn, msg, chat, usedPrefix, command, text }) {
+  // Usando los mismos parámetros exactos que tu comando .tag
+  async run({ sock, from, msg, text, reply, react }) {
     try {
-      const quoted = msg.quoted || null
-      const mediaType = quoted?.mtype?.replace(/Message$/i, '').toLowerCase()
+      await react('⏳');
 
-      if (quoted && ['image', 'video', 'audio', 'document'].includes(mediaType)) {
-        const buffer = await quoted.download()
-        
-        await sendGroupStatus(conn, chat, {
-          type: mediaType,
-          media: buffer,
-          caption: text || quoted.text || '',
-          mimetype: quoted.mime || undefined,
-          fileName: quoted.filename || undefined
-        })
+      // Obtener el mensaje citado de la estructura nativa de tu bot
+      const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || 
+                        msg.message?.ephemeralMessage?.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+
+      if (quotedMsg) {
+        const messageType = Object.keys(quotedMsg)[0];
+        const mediaType = messageType.replace('Message', '').toLowerCase();
+
+        if (['image', 'video', 'audio', 'document'].includes(mediaType)) {
+          // Si tu sistema tiene msg.quoted.download() implementado úsalo, 
+          // de lo contrario, se asume el manejo directo de la propiedad nativa del buffer si existiera.
+          // Como medida segura, descargamos usando la función nativa si msg.quoted no está mapeado por el handler:
+          let buffer;
+          if (msg.quoted && typeof msg.quoted.download === 'function') {
+            buffer = await msg.quoted.download();
+          } else {
+            // Fallback usando downloadMediaMessage de Baileys de ser necesario
+            const { downloadMediaMessage } = await import('@whiskeysockets/baileys');
+            buffer = await downloadMediaMessage({ message: quotedMsg }, 'buffer', {}, { logger: console });
+          }
+          
+          await sendGroupStatus(sock, from, {
+            type: mediaType,
+            media: buffer,
+            caption: text || quotedMsg[messageType]?.caption || '',
+            mimetype: quotedMsg[messageType]?.mimetype || undefined,
+            fileName: quotedMsg[messageType]?.fileName || undefined
+          });
+        } else {
+          const statusText = text || quotedMsg.conversation || quotedMsg.extendedTextMessage?.text || '';
+          if (!statusText) {
+            await react('❌');
+            return reply('❀ Escribe un texto o cita un archivo multimedia para subir como estado del grupo.');
+          }
+          
+          await sendGroupStatus(sock, from, {
+            type: 'text',
+            text: statusText
+          });
+        }
       } else {
-        const statusText = text || quoted?.text || ''
+        const statusText = text || '';
         if (!statusText) {
-          return conn.reply(chat, `❀ Escribe un texto o cita un archivo multimedia para subir como estado del grupo.\n\nEjemplo:\n${usedPrefix + command} Hola Grupo!`, msg)
+          await react('❌');
+          return reply('❀ Escribe un texto para subir como estado del grupo.');
         }
         
-        await sendGroupStatus(conn, chat, {
+        await sendGroupStatus(sock, from, {
           type: 'text',
           text: statusText
-        })
+        });
       }
 
-      conn.reply(chat, '> ✎ Estado del grupo enviado con éxito.', msg)
+      await react('✅');
+      reply('> ✎ Estado del grupo enviado con éxito.');
     } catch (e) {
-      console.error(e)
-      conn.reply(chat, `❌ Error al procesar el estado: ${e.message}`, msg)
+      console.error(e);
+      await react('❌');
+      reply(`❌ Error al procesar el estado: ${e.message}`);
     }
   }
 }
