@@ -11,12 +11,11 @@ export default {
   async run({ from, msg, react, reply }) {
     await react('⚙️')
 
-    // Limpiamos los JIDs para evitar fallos con los JIDs de multidispositivo (p. ej. 549xxx:1@s.whatsapp.net)
+    // Funciones para limpiar los JIDs de multidispositivo (elimina los :1, :2, etc.)
     const parseJid = (jid) => jid ? jid.split(':')[0].split('@')[0] + '@s.whatsapp.net' : null
     const parseNum = (jid) => jid ? jid.split(':')[0].split('@')[0] : 'N/A'
 
     const quoted = msg.message?.extendedTextMessage?.contextInfo || msg.message?.imageMessage?.contextInfo || msg.message?.videoMessage?.contextInfo
-    // Conseguimos el JID limpio de quien envió el mensaje citado
     const quotedSender = quoted?.participant ? parseJid(quoted.participant) : null
 
     // ─── SIN RESPONDER → MOSTRAR BOTS DISPONIBLES ───────
@@ -40,7 +39,6 @@ export default {
       texto += `\n💡 Responde a un mensaje de ese bot y ejecuta *.setprimary* de nuevo.\n\n`
       texto += `⚔️ _Yuta Okotsu MD | DuarteXV_`
 
-      // Se usa mentions para que se puedan ver bien los arrobas si se desea
       return await reply({ text: texto })
     }
 
@@ -48,7 +46,7 @@ export default {
     const whoJid = quotedSender
     const whoNum = parseNum(whoJid)
 
-    // Mapeamos los JIDs de los bots activos de forma limpia
+    // Mapeamos los JIDs de la lista de activos usando la misma limpieza
     const botsActivosJids = [...activeBots.entries()]
       .filter(([, bot]) => bot.status === 'online')
       .map(([, bot]) => parseJid(bot.jid))
@@ -73,7 +71,6 @@ export default {
       })
     }
 
-    // Guardamos solo el número puro o el Jid según lo requiera tu db.js
     db.setPrimary(from, whoNum)
 
     await reply({
