@@ -38,27 +38,8 @@ export default {
       return await reply({ text: texto })
     }
 
-    // ─── RESPONDIENDO → DIAGNÓSTICO EN EL CHAT ───────
+    // ─── RESPONDIENDO → ESTABLECER COMO PRIMARIO ───────
     const whoNum = quotedSender
-
-    // Obtenemos cómo están guardados los bots en activeBots
-    const botsActivosRaw = [...activeBots.entries()]
-      .filter(([, bot]) => bot.status === 'online')
-      .map(([, bot]) => bot.jid)
-
-    const botsActivosNums = botsActivosRaw.map(jid => parseJid(jid)).filter(Boolean)
-
-    // Si no lo encuentra, te escupe toda la información en el chat para ver el fallo
-    if (!botsActivosNums.includes(whoNum)) {
-      let debugTexto = `❌ *Ese usuario no es un bot activo.*\n\n`
-      debugTexto += `🔍 *DIAGNÓSTICO DEL CHAT:*\n`
-      debugTexto += `• ID del mensaje citado: \`${whoNum}\`\n`
-      debugTexto += `• IDs en activeBots (procesados): \`${JSON.stringify(botsActivosNums)}\`\n`
-      debugTexto += `• JIDs originales en memoria: \`${JSON.stringify(botsActivosRaw)}\`\n\n`
-      debugTexto += `💡 Compara los números para ver cuál no cuadra.`
-
-      return await reply({ text: debugTexto })
-    }
 
     const current = db.getPrimary(from)
     if (current === whoNum) {
@@ -67,6 +48,7 @@ export default {
       })
     }
 
+    // Guardamos directamente en la base de datos del grupo
     db.setPrimary(from, whoNum)
 
     await reply({
