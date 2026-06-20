@@ -8,9 +8,10 @@ export default {
   groupOnly: true,
   adminOnly: true,
 
-  async run({ from, msg, react, reply }) {
-    await react('⚙️')
-
+  async run({ from, msg, react, reply, conn }) {
+    // Conseguir el número del bot actual que está ejecutando este código
+    const miJid = conn.user?.id ? conn.user.id.split(':')[0].split('@')[0] : null
+    
     const parseJid = (jid) => jid ? jid.split(':')[0].split('@')[0] : null
 
     const quoted = msg.message?.extendedTextMessage?.contextInfo || msg.message?.imageMessage?.contextInfo || msg.message?.videoMessage?.contextInfo
@@ -18,14 +19,9 @@ export default {
 
     // ─── SIN RESPONDER → MOSTRAR BOTS DISPONIBLES ───────
     if (!quotedSender) {
+      // Solo el bot principal o el bot que use el comando primero debería listar
       const botsActivos = [...activeBots.entries()]
         .filter(([, bot]) => bot.status === 'online')
-
-      if (botsActivos.length === 0) {
-        return await reply({
-          text: `❌ *No hay bots activos disponibles.*\n\n⚔️ _Yuta Okotsu MD | DuarteXV_`
-        })
-      }
 
       let texto = `🤖 *¿A qué bot quieres como primario?*\n\n`
       for (const [, bot] of botsActivos) {
@@ -41,22 +37,36 @@ export default {
     // ─── RESPONDIENDO → ESTABLECER COMO PRIMARIO ───────
     const whoNum = quotedSender
 
-    const current = db.getPrimary(from)
-    if (current === whoNum) {
-      return await reply({
-        text: `⚠️ *Ese bot ya es el primario de este grupo.*\n\n⚔️ _Yuta Okotsu MD | DuarteXV_`
-      })
+    // IGNORAR SI ESTE BOT NO ES EL CITADO NI EL PRINCIPAL
+    // Esto evita que los dos bots respondan al mismo tiempo en el chat
+    if (miJid !== whoNum && miJid === '573175149414') {
+      // Si soy el bot viejo y no me estás citando a mí, me callo para no spamear el error
+      return; 
     }
 
-    // Guardamos directamente en la base de datos del grupo
+    const current = db.getPrimary(from)
+    if (current === whoNum) {
+      if (miJid === whoNum) { // Solo responde el bot afectado
+        return await reply({
+          text: `⚠️ *Ese bot ya es el primario de este grupo.*\n\n⚔️ _Yuta Okotsu MD | DuarteXV_`
+        })
+      }
+      return;
+    }
+
+    // Guardamos en la base de datos
     db.setPrimary(from, whoNum)
 
-    await reply({
-      text:
-        `✅ *Bot primario establecido*\n\n` +
-        `🤖 *${whoNum}* es ahora el bot principal.\n` +
-        `Los demás bots no responderán en este grupo.\n\n` +
-        `⚔️ _Yuta Okotsu MD | DuarteXV_`
-    })
+    // Solo el bot que fue elegido como primario responde confirmando la acción
+    if (miJid === whoNum) {
+      await react('✅')
+      await reply({
+        text:
+          `✅ *Bot primario establecido*\n\n` +
+          `🤖 *${whoNum}* es ahora el bot principal.\n` +
+          `Los demás bots no responderán en este grupo.\n\n` +
+          `⚔️ _Yuta Okotsu MD | DuarteXV_`
+      })
+    }
   }
 }
