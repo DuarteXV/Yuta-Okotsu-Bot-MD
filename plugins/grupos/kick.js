@@ -1,3 +1,5 @@
+import { groupCache } from "./handleMessage.js";
+
 export default {
   name: ['kick', 'expulsar'],
   description: 'Expulsa a un miembro del grupo',
@@ -34,6 +36,7 @@ export default {
 
     try {
       await sock.groupParticipantsUpdate(from, [targetJid], "remove")
+      groupCache.delete(from)
     } catch (e) {
       await reply({ text: `❌ No se pudo expulsar: ${e.message}` })
     }
