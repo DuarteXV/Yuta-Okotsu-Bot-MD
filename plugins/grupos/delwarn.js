@@ -30,7 +30,10 @@ export default {
       const userWarns = currentWarns[targetJid] || []
 
       if (userWarns.length === 0) {
-        return await reply({ text: `👤 @${targetJid.split('@')[0]} no tiene advertencias activas en este grupo.`, mentions: [targetJid] })
+        return await sock.sendMessage(from, {
+          text: `👤 El usuario @${targetJid.split('@')[0]} no tiene advertencias activas en este grupo.`,
+          mentions: [targetJid]
+        }, { quoted: msg })
       }
 
       userWarns.pop()
@@ -38,10 +41,11 @@ export default {
 
       db.setGroup(from, { ...groupData, warns: currentWarns })
 
-      await reply({ 
+      await sock.sendMessage(from, {
         text: `✅ Se ha removido una advertencia a @${targetJid.split('@')[0]}.\n📊 *Advertencias restantes:* ${userWarns.length}/3`,
         mentions: [targetJid]
-      })
+      }, { quoted: msg })
+
     } catch (err) {
       console.error("Error en comando delwarn:", err)
       await reply({ text: "❌ Ocurrió un error interno al ejecutar el comando." })
