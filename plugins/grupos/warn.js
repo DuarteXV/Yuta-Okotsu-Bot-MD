@@ -30,6 +30,13 @@ export default {
         return await reply({ text: `❌ No puedes advertir a otro administrador.` })
       }
 
+      // Intentar obtener el pushname de la persona advertida
+      // Buscamos en el mensaje citado si existe, o en el store del bot si está disponible
+      let targetName = contextInfo?.quotedMessage ? contextInfo?.pushName : null
+      if (!targetName) {
+        targetName = sock.store?.contacts?.[targetJid]?.name || sock.store?.contacts?.[targetJid]?.verifiedName || `@${targetJid.split('@')[0]}`
+      }
+
       const groupData = db.getGroup(from) || {}
       const currentWarns = groupData.warns || {}
       if (!currentWarns[targetJid]) currentWarns[targetJid] = []
@@ -40,7 +47,8 @@ export default {
       currentWarns[targetJid].push({
         razon,
         fecha: new Date().toLocaleDateString("es-CO"),
-        by: adminName
+        by: adminName,
+        userSavedName: targetName.startsWith('@') ? targetName : targetName
       })
 
       db.setGroup(from, { ...groupData, warns: currentWarns })
@@ -48,7 +56,7 @@ export default {
       const totalWarns = currentWarns[targetJid].length
 
       let texto = `⚠️ *¡USUARIO ADVERTIDO!* ⚠️\n\n`
-      texto += `👤 *Usuario:* @${targetJid.split('@')[0]}\n`
+      texto += `👤 *Usuario:* ${targetName.startsWith('@') ? targetName : `${targetName} (@${targetJid.split('@')[0]})`}\n`
       texto += `👮‍♂️ *Por:* ${adminName}\n`
       texto += `📝 *Razón:* ${razon}\n`
       texto += `📊 *Advertencias:* ${totalWarns}/3\n\n`
