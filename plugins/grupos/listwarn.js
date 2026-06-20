@@ -6,7 +6,7 @@ export default {
   category: 'grupos',
   groupOnly: true,
 
-  async run({ from, reply }) {
+  async run({ sock, from, msg, reply }) {
     try {
       const groupData = db.getGroup(from) || {}
       const groupWarns = groupData.warns || {}
@@ -22,17 +22,22 @@ export default {
 
       filtrados.forEach(([jid, lista], index) => {
         mentions.push(jid)
-        txt += `${index + 1}. 👤 *Usuario:* @${jid.split('@')[0]}\n`
+        const targetNum = jid.split('@')[0]
+        
+        txt += `${index + 1}. 👤 *Usuario:* @${targetNum}\n`
         txt += `   📊 *Total Warns:* ${lista.length}/3\n`
         txt += `   📝 *Historial:* \n`
         lista.forEach((w) => {
-          txt += `      • [${w.fecha}] ${w.razon} (por: @${w.by})\n`
-          if (!mentions.includes(`${w.by}@s.whatsapp.net`)) mentions.push(`${w.by}@s.whatsapp.net`)
+          txt += `      • [${w.fecha}] ${w.razon} (por: ${w.by})\n`
         })
         txt += `\n─────────────────\n\n`
       })
 
-      await reply({ text: txt.trim(), mentions })
+      await sock.sendMessage(from, {
+        text: txt.trim(),
+        mentions: mentions
+      }, { quoted: msg })
+
     } catch (err) {
       console.error("Error en comando listwarn:", err)
       await reply({ text: "❌ Ocurrió un error interno al ejecutar el comando." })
