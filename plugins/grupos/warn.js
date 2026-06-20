@@ -50,7 +50,7 @@ export default {
       const totalWarns = currentWarns[targetJid].length
 
       let texto = `⚠️ *¡USUARIO ADVERTIDO!* ⚠️\n\n`
-      texto += `👤 *Usuario:* @${targetNum}\n` // Mención nativa
+      texto += `👤 *Usuario:* @${targetNum}\n`
       texto += `👮‍♂️ *Por:* ${adminName}\n`
       texto += `📝 *Razón:* ${razon}\n`
       texto += `📊 *Advertencias:* ${totalWarns}/3\n\n`
@@ -59,8 +59,12 @@ export default {
         texto += `❗ *Nota:* Este usuario ha alcanzado el límite de 3 advertencias.`
       }
 
-      // Importante: El JID en mentions debe coincidir para que WhatsApp renderice el nombre
-      await reply({ text: texto, mentions: [targetJid] })
+      // 🚀 Enviamos de forma nativa con Baileys saltándonos el "reply" para asegurar el renderizado
+      await sock.sendMessage(from, {
+        text: texto,
+        mentions: [targetJid]
+      }, { quoted: msg })
+
     } catch (err) {
       console.error("Error en comando warn:", err)
       await reply({ text: "❌ Ocurrió un error interno al ejecutar el comando." })
