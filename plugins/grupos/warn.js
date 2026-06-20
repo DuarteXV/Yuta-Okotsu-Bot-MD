@@ -59,7 +59,6 @@ export default {
         texto += `❗ *Nota:* Este usuario ha alcanzado el límite de 3 advertencias.`
       }
 
-      // 🚀 Enviamos de forma nativa con Baileys saltándonos el "reply" para asegurar el renderizado
       await sock.sendMessage(from, {
         text: texto,
         mentions: [targetJid]
