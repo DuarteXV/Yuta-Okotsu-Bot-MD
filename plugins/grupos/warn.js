@@ -36,8 +36,6 @@ export default {
 
       const adminName = msg.pushName || "Admin"
       const razon = args.join(" ") || "No se especificó una razón."
-      
-      // Extraemos el número limpio para el historial, tal como hace tu menú
       const targetNum = targetJid.split('@')[0]
 
       currentWarns[targetJid].push({
@@ -52,7 +50,7 @@ export default {
       const totalWarns = currentWarns[targetJid].length
 
       let texto = `⚠️ *¡USUARIO ADVERTIDO!* ⚠️\n\n`
-      texto += `👤 *Usuario:* @${targetNum}\n` // Mención idéntica a la del menú
+      texto += `👤 *Usuario:* @${targetNum}\n` // Mención nativa
       texto += `👮‍♂️ *Por:* ${adminName}\n`
       texto += `📝 *Razón:* ${razon}\n`
       texto += `📊 *Advertencias:* ${totalWarns}/3\n\n`
@@ -61,6 +59,7 @@ export default {
         texto += `❗ *Nota:* Este usuario ha alcanzado el límite de 3 advertencias.`
       }
 
+      // Importante: El JID en mentions debe coincidir para que WhatsApp renderice el nombre
       await reply({ text: texto, mentions: [targetJid] })
     } catch (err) {
       console.error("Error en comando warn:", err)
