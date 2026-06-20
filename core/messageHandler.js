@@ -56,7 +56,6 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN") {
     const usedPrefix = prefixes.find((p) => body.startsWith(p)) ?? null;
     const isCmd      = !!usedPrefix;
 
-    // Si el mensaje es del propio bot pero NO es un comando, lo ignoramos para evitar bucles.
     if (msg.key?.fromMe && !isCmd) return;
 
     const cmdName = isCmd ? body.slice(usedPrefix.length).trim().split(/\s+/)[0].toLowerCase() : "";
@@ -81,7 +80,6 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN") {
         }
       }
 
-      // Validamos el bot primario, PERO permitimos que todos escuchen si el comando es 'delprimary'
       const primaryBot = db.getPrimary(from);
       if (primaryBot && cmdName !== "delprimary") {
         const myId = botJid.split("@")[0];
@@ -99,14 +97,14 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN") {
     let isBotAdmin = false;
 
     if (isGroup && groupMeta?.participants) {
-      const botNum = botJid.split("@")[0];
-      for (const p of groupMeta.participants) {
-        const num        = p.id.split(":")[0].split("@")[0];
-        const isAdminRole = p.admin === "admin" || p.admin === "superadmin";
-        if (num === senderNum) isAdmin    = isAdminRole;
-        if (num === botNum)    isBotAdmin = isAdminRole;
-        if (isAdmin && isBotAdmin) break;
-      }
+      const botJidClean = botJid.split(':')[0] + '@s.whatsapp.net';
+      const senderJidClean = sender.split(':')[0] + '@s.whatsapp.net';
+
+      const botParticipant = groupMeta.participants.find(p => p.id.split(':')[0] + '@s.whatsapp.net' === botJidClean);
+      const senderParticipant = groupMeta.participants.find(p => p.id.split(':')[0] + '@s.whatsapp.net' === senderJidClean);
+
+      isAdmin = senderParticipant?.admin === 'admin' || senderParticipant?.admin === 'superadmin';
+      isBotAdmin = botParticipant?.admin === 'admin' || botParticipant?.admin === 'superadmin';
     }
 
     log.message({ from, sender, isGroup, groupName, body, isCmd, cmdName, botLabel, msgTypeLabel });
