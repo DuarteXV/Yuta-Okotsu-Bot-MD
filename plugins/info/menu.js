@@ -39,7 +39,7 @@ const catIcons = {
 
 export default {
   name: ["menu", "help", "ayuda"],
-  description: "Muestra el menú.",
+  description: "Muestra el menú del sistema.",
   category: "info",
   ownerOnly: false,
 
@@ -52,8 +52,9 @@ export default {
       const currentBotJid = sock.user?.id ? sock.user.id.split('@')[0].split(':')[0] + '@s.whatsapp.net' : '';
       const botData = db.getBot(currentBotJid);
       
-      const urlFoto = botData?.banner || "https://files.evogb.win/1oU31I.jpg";
-      const tipoBot = botData?.isMain ? "🤖 Bot Principal" : "🧪 Subbot Activo";
+      const nombreBot = botData?.label || "MULTIDEVICE BOT";
+      const urlFoto   = botData?.banner || "https://files.evogb.win/1oU31I.jpg";
+      const tipoBot   = botData?.isMain ? "Bot Principal" : "Subbot";
 
       const linkMatch = "https://mancosyasociados.kesug.com";
 
@@ -68,19 +69,18 @@ export default {
         categories[cat].add(names[0])
       }
 
-      let textoMenu = `✨ ═══ 🫧 *𝐘𝐔𝐓𝐀 𝐎𝐊𝐎𝐓𝐒𝐔* 🫧 ═══ ✨\n`;
-      textoMenu += `⚔️ _*𝓔𝐥 𝐇𝐞𝐜𝐡𝐢𝐜𝐞𝐫𝐨 𝐝𝐞 𝐆𝐫𝐚𝐝𝐨 𝐄𝐬𝐩𝐞𝐜𝐢𝐚𝐥 𝐡𝐚 𝐝𝐞𝐬𝐩𝐞𝐫𝐭𝐚𝐝𝐨*_\n\n`;
+      let textoMenu = `✨ ═══ 🫧 *${nombreBot.toUpperCase()}* 🫧 ═══ ✨\n\n`;
 
-      textoMenu += `╔════ 🪐 *𝗜𝗡𝗙𝗢 𝗗𝗘𝗟 𝗦𝗜𝗦𝗧𝗘𝗠𝗔* 🪐 ════╗\n`;
-      textoMenu += `┃ 👤 *⎯꯭♱𝆬       ְ ⃝𝐔𝐬𝐮𝐚𝐫𝐢𝐨:* @${senderNum}\n`;
-      textoMenu += `┃ ⚙️ *⎯꯭♱𝆬       ְ ⃝𝗧𝗶𝗽𝗼:* ${tipoBot}\n`;
-      textoMenu += `┃ 📍 *⎯꯭♱𝆬       ְ ⃝𝐂𝐚𝐧𝐚ล:* ${lugar}\n`;
-      textoMenu += `┃ ⏰ *⎯꯭♱𝆬       ְ ⃝𝐇𝐨𝐫𝐚:* ${hora}\n`;
-      textoMenu += `┃ 📅 *⎯꯭♱𝆬       ְ ⃝𝐅𝐞𝐜𝐡𝐚:* ${fecha}\n`;
+      textoMenu += `╔════ 🪐 *𝗦𝗜𝗦𝗧𝗘𝗠𝗔* 🪐 ════╗\n`;
+      textoMenu += `┃ 👤 *Usuario:* @${senderNum}\n`;
+      textoMenu += `┃ ⚙️ *Rango:* ${tipoBot}\n`;
+      textoMenu += `┃ 📍 *Canal:* ${lugar}\n`;
+      textoMenu += `┃ ⏰ *Hora:* ${hora}\n`;
+      textoMenu += `┃ 📅 *Fecha:* ${fecha}\n`;
       textoMenu += `╚════════════════════════╝\n\n`;
 
-      textoMenu += `*📜 ㅤ𔗁꯭᭮֔   𝗟𝗜𝗦𝗧𝗔 𝗗𝗘 𝗖𝗢🇲𝗔𝗡𝗗𝗢𝗦* 📜\n`;
-      textoMenu += `_𝐑𝐞𝐜𝐮𝐞𝐫𝐝𝐚 𝐔𝐬𝐚𝐫 𝐄𝐥 𝐏𝐫𝐞𝐟𝐢𝐣𝐨 [ ${usedPrefix} ] 𝐚𝐧𝐭𝐞𝐬 𝐝𝐞 𝐜𝐚𝐝𝐚 𝐨𝐫𝐝𝐞𝐧._\n\n`;
+      textoMenu += `*📜  𝗟𝗜𝗦𝗧𝗔 𝗗𝗘 𝗖𝗢𝗠𝗔𝗡𝗗𝗢𝗦* 📜\n`;
+      textoMenu += `_Usa el prefijo [ ${usedPrefix} ] antes de cada orden._\n\n`;
 
       for (const [cat, cmds] of Object.entries(categories)) {
         const categoriaLimped = cat.toLowerCase().trim();
@@ -93,7 +93,7 @@ export default {
         textoMenu += "\n";
       }
 
-      textoMenu += `🪼 _⎯꯭♱𝆬       ְ𝐏𝐨𝐰𝐞𝐫𝐞𝐝 𝐛𝐲 𝐃𝐮𝐚𝐫𝐭𝐞𝐗𝐕 | 𝐘𝐮𝐭𝐚 𝐎𝐤𝐨𝐭𝐬𝐮 𝐌𝐃_ 🪼\n`;
+      textoMenu += `🪼 _Powered by DuarteXV_\n`;
       textoMenu += `🔗 ${linkMatch}`;
 
       let imgBanner
@@ -118,8 +118,8 @@ export default {
           text: textoMenu,
           matchedText: linkMatch,
           canonicalUrl: linkMatch,
-          description: "Developed by DuarteXV ❄",
-          title: "YUTA OKOTSU",
+          description: "Sistema Multidevice Sencillo",
+          title: nombreBot,
           previewType: 0,
           jpegThumbnail: imgBanner.jpegThumbnail,
           thumbnailDirectPath: imgBanner.directPath,
