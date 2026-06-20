@@ -13,27 +13,24 @@ export default {
 
     const id = `sub_${senderNum}`
 
-    // ─── YA CONECTADO ────────────────────────────────────
     if (activeBots.has(id) && activeBots.get(id).status === 'online') {
       return await reply({
         text: `⚠️ Tu número ya está vinculado como subbot.\nUsa *.delbot* para desvincularlo.`
       })
     }
 
-    // ─── COOLDOWN 1 MINUTO ───────────────────────────────
     if (cooldowns.has(senderNum)) {
       const diff    = Date.now() - cooldowns.get(senderNum)
       const restante = Math.ceil((60000 - diff) / 1000)
       if (diff < 60000) {
         return await reply({
-          text: `⏳ Ya pediste un código recientemente.\nEspera *${restante} segundos* antes de pedir otro.`
+          text: `🌾 Ya pediste un código recientemente.\nEspera *${restante} segundos* antes de pedir otro.`
         })
       }
     }
 
     cooldowns.set(senderNum, Date.now())
 
-    // ─── INSTRUCCIONES ───────────────────────────────────
     await reply({
       text: `⚔️ *VINCULACIÓN DE SUBBOT*\n\n` +
         `📋 *Instrucciones:*\n` +
@@ -45,10 +42,9 @@ export default {
         `⏳ _Generando código..._`
     })
 
-    // ─── CÓDIGO ──────────────────────────────────────────
     try {
       const phone = senderNum.replace(/\D/g, '')
-      const code  = await requestSubbotCode(id, phone)
+      const code  = await requestSubbotCode(id, phone, sock, from)
 
       await sock.sendMessage(from, {
         text: `${code}`
