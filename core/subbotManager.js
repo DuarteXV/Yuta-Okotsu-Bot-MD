@@ -2,28 +2,30 @@ import { Worker } from "worker_threads";
 import fs from "fs";
 import path from "path";
 import { log } from "./logger.js";
-import { db } from "../database/db.js"; // Base de datos dinámica para estados globales
+import { db } from "../database/db.js";
 
 const SUBBOTS_DIR = "./sessions/subbots";
 if (!fs.existsSync(SUBBOTS_DIR)) fs.mkdirSync(SUBBOTS_DIR, { recursive: true });
 
-// Mantenemos el Map local por compatibilidad interna de tus hilos
 export const activeBots = new Map();
 const workers = new Map();
 
+let mainSock = null;
+
 export function registerMainBot(sock, label = "MAIN") {
+  mainSock = sock;
   const jid = sock.user?.id || "";
   const status = jid ? "online" : "connecting";
 
-  // Guardamos en memoria local y en la DB compartida
   activeBots.set("main", { label, jid, status, isMain: true });
   db.setBot("main", { label, jid, status, isMain: true });
 
   if (!jid) {
     sock.ev.on("connection.update", ({ connection }) => {
       if (connection === "open") {
+        mainSock = sock;
         const currentJid = sock.user?.id || "";
-        
+
         activeBots.set("main", { label, jid: currentJid, status: "online", isMain: true });
         db.setBot("main", { label, jid: currentJid, status: "online", isMain: true });
       }
@@ -31,11 +33,21 @@ export function registerMainBot(sock, label = "MAIN") {
   }
 }
 
+async function sendMainMessage(jid, text) {
+  try {
+    if (!mainSock) {
+      log.warn("[MANAGER] No hay socket principal para enviar mensaje");
+      return;
+    }
+    await mainSock.sendMessage(jid, { text });
+  } catch (e) {
+    log.error(`[MANAGER] Error enviando mensaje desde el bot principal: ${e.message}`);
+  }
+}
+
 export function updateBotStatus(id, data) {
   const current = activeBots.get(id) || {};
   activeBots.set(id, { ...current, ...data });
-  
-  // Sincroniza automáticamente cualquier cambio de estado a SQLite
   db.setBot(id, data);
 }
 
@@ -45,9 +57,9 @@ export function removeSubbot(id) {
     worker.terminate();
     workers.delete(id);
   }
-  
+
   activeBots.delete(id);
-  db.setBot(id, { status: "offline" }); // Marcar como offline en la DB global
+  db.setBot(id, { status: "offline" });
 
   const sessionDir = `${SUBBOTS_DIR}/${id}`;
   if (fs.existsSync(sessionDir)) {
@@ -89,7 +101,6 @@ export function launchSubbot(id) {
     log.warn(`[MANAGER] Worker ${id} salió (code: ${code})`);
 
     const sessionDir2 = `${SUBBOTS_DIR}/${id}`;
-    // Cambiado: Ahora verifica 'auth.db' en lugar del antiguo 'creds.json'
     if (fs.existsSync(path.join(sessionDir2, "auth.db"))) {
       log.info(`[MANAGER] Reconectando subbot ${id} en 5s...`);
       setTimeout(() => launchSubbot(id), 5000);
@@ -125,7 +136,7 @@ export async function requestSubbotCode(id, phoneNumber) {
     }, 15000);
 
     const cleanupTimeout = setTimeout(() => {
-      const bot = db.getBot(id); // Validamos contra la DB global
+      const bot = db.getBot(id);
       if (!bot || bot.status !== "online") {
         log.warn(`[MANAGER] Subbot ${id} nunca se conectó — eliminado`);
         removeSubbot(id);
@@ -145,6 +156,16 @@ export async function requestSubbotCode(id, phoneNumber) {
         });
         if (msg.status === "online") {
           clearTimeout(cleanupTimeout);
+
+          const userNum = id.replace("sub_", "");
+          const userJid = msg.jid
+            ? msg.jid.split(":")[0] + "@s.whatsapp.net"
+            : `${userNum}@s.whatsapp.net`;
+
+          sendMainMessage(userJid,
+            "📍 *Has vinculado un subbot con éxito*\n" +
+            "> • Puedes usar *.delbot* para desvincularlo cuando quieras."
+          );
         }
       }
       if (msg.type === "logged_out") {
@@ -156,9 +177,8 @@ export async function requestSubbotCode(id, phoneNumber) {
     worker.on("exit", (code) => {
       workers.delete(id);
       clearTimeout(timeout);
-      
+
       const sessionDir2 = `${SUBBOTS_DIR}/${id}`;
-      // Cambiado: Ahora verifica 'auth.db' en lugar del antiguo 'creds.json'
       if (fs.existsSync(path.join(sessionDir2, "auth.db"))) {
         setTimeout(() => launchSubbot(id), 5000);
       } else {
