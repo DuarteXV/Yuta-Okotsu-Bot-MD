@@ -25,7 +25,7 @@ export default {
       const quotedContext = rawMessage?.extendedTextMessage?.contextInfo
 
       let targetBotJid = null
-      let nuevoNombre = ''
+      let textoBruto = args.join(" ")
 
       if (esOwnerGlobal) {
         const mentioned = quotedContext?.mentionedJid || []
@@ -33,18 +33,18 @@ export default {
         
         if (targetRaw) {
           targetBotJid = cleanJid(targetRaw)
-          nuevoNombre = args.join(" ")
         } else {
           targetBotJid = currentBotJid
-          nuevoNombre = args.join(" ")
         }
       } else {
         targetBotJid = currentBotJid
-        nuevoNombre = args.join(" ")
       }
 
-      if (!nuevoNombre || nuevoNombre.trim() === '') {
-        return await reply({ text: '⚠️ Especifica el nuevo nombre para el bot.' })
+      // Limpieza estricta: Remueve menciones como @591xxxx del texto final para evitar duplicados visuales
+      let nuevoNombre = textoBruto.replace(/@\d+/g, '').trim()
+
+      if (!nuevoNombre || nuevoNombre === '') {
+        return await reply({ text: '⚠️ Especifica el nuevo nombre para el bot (solo texto limpio).' })
       }
 
       const mainBotJid = cleanJid(sock.user?.id) 
@@ -58,10 +58,10 @@ export default {
         return await reply({ text: '❌ El usuario seleccionado no está registrado como un subbot activo en la base de datos.' })
       }
 
-      db.setBot(targetBotJid, { label: nuevoNombre.trim() })
+      db.setBot(targetBotJid, { label: nuevoNombre })
 
       const targetNum = targetBotJid.split('@')[0]
-      let textoConfirmacion = `✅ *Nombre actualizado con éxito*\n\n🤖 *Bot:* @${targetNum}\n📝 *Nuevo Nombre:* ${nuevoNombre.trim()}`
+      let textoConfirmacion = `✅ *Nombre actualizado con éxito*\n\n🤖 *Bot:* @${targetNum}\n📝 *Nuevo Nombre:* ${nuevoNombre}`
 
       await sock.sendMessage(from, {
         text: textoConfirmacion,
