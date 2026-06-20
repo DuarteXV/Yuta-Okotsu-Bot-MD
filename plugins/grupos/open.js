@@ -8,14 +8,20 @@ export default {
     const groupMetaReal = await sock.groupMetadata(from)
     const participants = groupMetaReal.participants || []
 
-    const senderJid = msg.key.participant?.split(':')[0] + '@s.whatsapp.net' || msg.key.remoteJid?.split(':')[0] + '@s.whatsapp.net'
-    const senderParticipant = participants.find(p => p.id.split(':')[0] + '@s.whatsapp.net' === senderJid)
+    // Limpieza de JIDs exacta
+    const cleanJid = (id) => id ? id.split('@')[0].split(':')[0] + '@s.whatsapp.net' : ''
+    
+    const senderJid = cleanJid(msg.key.participant || msg.participant || from)
+    const botJid = cleanJid(sock.user?.id)
+
+    // Validar rango del usuario que ejecuta
+    const senderParticipant = participants.find(p => cleanJid(p.id) === senderJid)
     const isSenderAdmin = senderParticipant?.admin === 'admin' || senderParticipant?.admin === 'superadmin'
 
     if (!isSenderAdmin) return await reply({ text: "❌ Solo admins del grupo pueden usar este comando." })
 
-    const botJid = sock.user?.id?.split(':')[0] + '@s.whatsapp.net'
-    const botParticipant = participants.find(p => p.id.split(':')[0] + '@s.whatsapp.net' === botJid)
+    // Validar rango del bot
+    const botParticipant = participants.find(p => cleanJid(p.id) === botJid)
     const isBotAdmin = botParticipant?.admin === 'admin' || botParticipant?.admin === 'superadmin'
 
     if (!isBotAdmin) return await reply({ text: "❌ El bot necesita ser admin para abrir el grupo." })
