@@ -11,9 +11,7 @@ export default {
   async run({ from, msg, react, reply }) {
     await react('⚙️')
 
-    // Funciones para limpiar los JIDs de multidispositivo (elimina los :1, :2, etc.)
-    const parseJid = (jid) => jid ? jid.split(':')[0].split('@')[0] + '@s.whatsapp.net' : null
-    const parseNum = (jid) => jid ? jid.split(':')[0].split('@')[0] : 'N/A'
+    const parseJid = (jid) => jid ? jid.split(':')[0].split('@')[0] : null
 
     const quoted = msg.message?.extendedTextMessage?.contextInfo || msg.message?.imageMessage?.contextInfo || msg.message?.videoMessage?.contextInfo
     const quotedSender = quoted?.participant ? parseJid(quoted.participant) : null
@@ -25,15 +23,13 @@ export default {
 
       if (botsActivos.length === 0) {
         return await reply({
-          text:
-            `❌ *No hay bots activos disponibles.*\n\n` +
-            `⚔️ _Yuta Okotsu MD | DuarteXV_`
+          text: `❌ *No hay bots activos disponibles.*\n\n⚔️ _Yuta Okotsu MD | DuarteXV_`
         })
       }
 
       let texto = `🤖 *¿A qué bot quieres como primario?*\n\n`
       for (const [, bot] of botsActivos) {
-        const num = parseNum(bot.jid)
+        const num = parseJid(bot.jid) || 'N/A'
         texto += `  ✦ *${bot.label || 'Sub-Bot'}* → @${num}\n`
       }
       texto += `\n💡 Responde a un mensaje de ese bot y ejecuta *.setprimary* de nuevo.\n\n`
@@ -42,32 +38,32 @@ export default {
       return await reply({ text: texto })
     }
 
-    // ─── RESPONDIENDO → ESTABLECER ESE BOT COMO PRIMARIO ─
-    const whoJid = quotedSender
-    const whoNum = parseNum(whoJid)
+    // ─── RESPONDIENDO → DIAGNÓSTICO EN EL CHAT ───────
+    const whoNum = quotedSender
 
-    // Mapeamos los JIDs de la lista de activos usando la misma limpieza
-    const botsActivosJids = [...activeBots.entries()]
+    // Obtenemos cómo están guardados los bots en activeBots
+    const botsActivosRaw = [...activeBots.entries()]
       .filter(([, bot]) => bot.status === 'online')
-      .map(([, bot]) => parseJid(bot.jid))
-      .filter(Boolean)
+      .map(([, bot]) => bot.jid)
 
-    if (!botsActivosJids.includes(whoJid)) {
-      return await reply({
-        text:
-          `❌ *Ese usuario no es un bot activo.*\n\n` +
-          `💡 Responde al mensaje de un bot activo.\n` +
-          `Usa *.bots* para ver los disponibles.\n\n` +
-          `⚔️ _Yuta Okotsu MD | DuarteXV_`
-      })
+    const botsActivosNums = botsActivosRaw.map(jid => parseJid(jid)).filter(Boolean)
+
+    // Si no lo encuentra, te escupe toda la información en el chat para ver el fallo
+    if (!botsActivosNums.includes(whoNum)) {
+      let debugTexto = `❌ *Ese usuario no es un bot activo.*\n\n`
+      debugTexto += `🔍 *DIAGNÓSTICO DEL CHAT:*\n`
+      debugTexto += `• ID del mensaje citado: \`${whoNum}\`\n`
+      debugTexto += `• IDs en activeBots (procesados): \`${JSON.stringify(botsActivosNums)}\`\n`
+      debugTexto += `• JIDs originales en memoria: \`${JSON.stringify(botsActivosRaw)}\`\n\n`
+      debugTexto += `💡 Compara los números para ver cuál no cuadra.`
+
+      return await reply({ text: debugTexto })
     }
 
     const current = db.getPrimary(from)
     if (current === whoNum) {
       return await reply({
-        text:
-          `⚠️ *Ese bot ya es el primario de este grupo.*\n\n` +
-          `⚔️ _Yuta Okotsu MD | DuarteXV_`
+        text: `⚠️ *Ese bot ya es el primario de este grupo.*\n\n⚔️ _Yuta Okotsu MD | DuarteXV_`
       })
     }
 
