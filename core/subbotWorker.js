@@ -12,7 +12,7 @@ import { mkdir } from "fs/promises";
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
-import { handleMessage } from "./messageHandler.js";
+import { handleMessage, invalidateGroupCache } from "./messageHandler.js";
 import { loadPlugins } from "./pluginLoader.js";
 
 const { id, sessionDir, phoneNumber, mainBotNum } = workerData;
@@ -178,6 +178,12 @@ async function startWorker(_attempt = 0) {
   });
 
   sock.ev.on("creds.update", saveCreds);
+
+  // 🔄 Misma invalidación de cache que en el bot principal, así un cambio
+  // de admin detectado por un subbot también refresca el estado para todos.
+  sock.ev.on("group-participants.update", ({ id: groupId }) => {
+    invalidateGroupCache(groupId);
+  });
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify") return;
