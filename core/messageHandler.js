@@ -6,6 +6,14 @@ import { db } from "../database/db.js";
 const groupCache = new Map();
 const prefixes = Array.isArray(config.prefix) ? config.prefix : [config.prefix];
 
+// 🔄 Permite invalidar el cache de un grupo específico desde fuera de este
+// módulo (por ejemplo, cuando Baileys dispara "group-participants.update"
+// tras un promote/demote/kick/add). Así los comandos adminOnly nunca leen
+// datos viejos de quién es admin.
+export function invalidateGroupCache(groupJid) {
+  groupCache.delete(groupJid);
+}
+
 function cleanJid(jid = "") {
   if (!jid) return "";
   const atIndex = jid.lastIndexOf("@");
