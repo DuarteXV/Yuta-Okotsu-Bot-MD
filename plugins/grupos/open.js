@@ -25,7 +25,7 @@ export default {
 
     try {
       await sock.groupSettingUpdate(from, 'not_announcement')
-      await reply({ text: "꒰ 𑁍 ꒱ E𝗅 gꭇᥙ⍴o ⍺ 𝗌іძo ⍺ᑲiᧉꭇƚo.\n> ¡ahora todos los miembros pueden enviar mensajes." })
+      await reply({ text: "꒰ 𑁍 ꒱ E𝗅 gꭇᥙ⍴o ⍺ 𝗌іძo ⍺ᑲiᧉꭇƚo.\n> ¡ahora todos los miembros pueden enviar mensajes!." })
     } catch (e) {
       await reply({ text: `❌ Hubo un error al abrir el grupo: ${e.message}` })
     }
