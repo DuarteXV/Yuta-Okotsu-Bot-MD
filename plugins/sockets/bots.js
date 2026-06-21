@@ -1,4 +1,5 @@
 import { db } from '../../database/db.js'
+import config from '../../config.js'
 
 export default {
   name: ['bots', 'listbots'],
@@ -32,17 +33,11 @@ export default {
     let listaFiltrada = []
     const numerosVistos = new Set()
 
-    // 2. Insertar SIEMPRE al Bot Principal real en el puesto #1 con su corona
+    // 2. Insertar SIEMPRE al Bot Principal real en el puesto #1 con su corona.
+    // El Main siempre se etiqueta como "MAIN", sin importar el config.botName.
     if (numeroMainReal) {
-      const datosMain = db.getBot(`${numeroMainReal}@s.whatsapp.net`) || db.getBot('main')
-      let labelMain = datosMain?.label || 'MAIN'
-
-      if (labelMain.startsWith('SUB_') || labelMain === 'Subbot') {
-        labelMain = 'MAIN'
-      }
-
       listaFiltrada.push({
-        label: labelMain.toUpperCase(),
+        label: 'MAIN',
         jid: numeroMainReal,
         isMain: true
       })
@@ -58,8 +53,10 @@ export default {
       if (numerosVistos.has(subNum) || subNum === numeroMainReal) continue
       numerosVistos.add(subNum)
 
+      // Si el subbot nunca fue renombrado (sigue con su label automático),
+      // mostramos el nombre del bot (config.botName) en vez de la palabra "Subbot"
       const esLabelAutomatico = sub.label?.startsWith('SUB_') || sub.label === 'Subbot' || sub.label === 'MAIN'
-      const nombreSub = esLabelAutomatico ? 'Subbot' : sub.label
+      const nombreSub = esLabelAutomatico ? config.botName : sub.label
 
       listaFiltrada.push({
         label: nombreSub,
@@ -68,9 +65,8 @@ export default {
       })
     }
 
-    // El encabezado SIEMPRE refleja al bot Principal, sin importar qué bot
-    // (main o subbot) sea el que está respondiendo este comando
-    const nombreBotEncabezado = listaFiltrada[0]?.label || "MAIN"
+    // El encabezado SIEMPRE refleja al bot Principal -> "MAIN"
+    const nombreBotEncabezado = listaFiltrada[0]?.label || 'MAIN'
 
     // 4. Construcción del mensaje estético final
     let text = `✨ ═══ 🫧 *${nombreBotEncabezado.toUpperCase()}* 🫧 ═══ ✨\n`
