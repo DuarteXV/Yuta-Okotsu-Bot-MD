@@ -123,7 +123,14 @@ export const db = {
 
   // Retorna una lista con TODOS los bots registrados y sus objetos JSON limpios
   // Incluye "id" además de "jid" para búsquedas explícitas por llave.
+  // 🔄 Antes de leer, forzamos un checkpoint pasivo del WAL para asegurar
+  // que esta conexión vea los cambios más recientes escritos por OTROS
+  // workers/subbots (cada subbot corre con su propia conexión SQLite).
   getAllBots() {
+    try {
+      db_instance.pragma("wal_checkpoint(PASSIVE)");
+    } catch {}
+
     const rows = stmts.getAllBots.all();
     return rows.map(row => ({
       id: row.jid,
