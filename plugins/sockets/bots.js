@@ -9,7 +9,6 @@ export default {
   async run({ sock, react, reply, mainBotNum }) {
     await react('🤖')
 
-    // Limpia el JID eliminando carácteres o sub-ids de Baileys
     const obtenerNumeroLimpio = (jid) => {
       if (!jid) return null
       return jid.split('@')[0].split(':')[0].replace(/\D/g, '')
@@ -19,11 +18,6 @@ export default {
     const todosLosBots = db.getAllBots ? db.getAllBots() : []
 
     // 1. Determinar el número del verdadero Bot Principal
-    // Prioridad:
-    //   a) mainBotNum recibido por ctx -> funciona tanto en MAIN como en subbots,
-    //      porque viaja desde subbotManager -> workerData -> handleMessage -> ctx
-    //   b) global.mainBotNum -> fallback si corre directo en el proceso principal
-    //   c) DB -> último fallback, por si lo anterior no estuviera disponible
     let numeroMainReal = null
 
     if (mainBotNum) {
@@ -53,7 +47,7 @@ export default {
         isMain: true
       })
 
-      numerosVistos.add(numeroMainReal) // Bloquea este número para que ningún subbot lo repita abajo
+      numerosVistos.add(numeroMainReal)
     }
 
     // 3. Agregar el resto de subbots en línea, eliminando duplicados mediante el Set
@@ -61,7 +55,6 @@ export default {
       const subNum = obtenerNumeroLimpio(sub.jid)
       if (!subNum) continue
 
-      // Si el número ya fue procesado o coincide con el Main real, se ignora por completo
       if (numerosVistos.has(subNum) || subNum === numeroMainReal) continue
       numerosVistos.add(subNum)
 
@@ -75,16 +68,9 @@ export default {
       })
     }
 
-    // Obtener el nombre del bot actual que está respondiendo en el chat
-    const miNumeroActual = obtenerNumeroLimpio(sock.user?.id)
-    const miJidActual = miNumeroActual ? miNumeroActual + '@s.whatsapp.net' : ''
-    const misDatos = db.getBot(miJidActual)
-
-    // Si soy un subbot, mi encabezado debe reflejar mi identidad limpia
-    let nombreBotEncabezado = misDatos?.label || "SUBBOT"
-    if (miNumeroActual === numeroMainReal) {
-      nombreBotEncabezado = (misDatos?.label && misDatos.label !== 'Subbot' ? misDatos.label : "MAIN").toUpperCase()
-    }
+    // El encabezado SIEMPRE refleja al bot Principal, sin importar qué bot
+    // (main o subbot) sea el que está respondiendo este comando
+    const nombreBotEncabezado = listaFiltrada[0]?.label || "MAIN"
 
     // 4. Construcción del mensaje estético final
     let text = `✨ ═══ 🫧 *${nombreBotEncabezado.toUpperCase()}* 🫧 ═══ ✨\n`
