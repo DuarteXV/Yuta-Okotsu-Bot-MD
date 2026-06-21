@@ -13,12 +13,10 @@ db_instance.exec(`
     jid TEXT PRIMARY KEY,
     data TEXT DEFAULT '{}'
   );
-  
   CREATE TABLE IF NOT EXISTS groups (
     jid TEXT PRIMARY KEY,
     data TEXT DEFAULT '{}'
   );
-
   CREATE TABLE IF NOT EXISTS bots (
     jid TEXT PRIMARY KEY,
     data TEXT DEFAULT '{}'
@@ -51,7 +49,6 @@ function getUser(jid) {
       banned: false,
       registeredAt: new Date().toISOString()
     };
-    // Corregido: Se pasa tanto el 'jid' como la data JSON para la inserción limpia
     stmts.insertUser.run(jid, JSON.stringify(defaultUser));
     return defaultUser;
   }
@@ -66,7 +63,6 @@ function getGroup(jid) {
       antilink: false,
       primaryBot: null
     };
-    // Corregido: Se pasa tanto el 'jid' como la data JSON
     stmts.insertGroup.run(jid, JSON.stringify(defaultGroup));
     return defaultGroup;
   }
@@ -82,7 +78,6 @@ function getBot(jid) {
       isMain: false,
       status: "offline"
     };
-    // Corregido: Se pasa tanto el 'jid' como la data JSON
     stmts.insertBot.run(jid, JSON.stringify(defaultBot));
     return defaultBot;
   }
@@ -107,20 +102,29 @@ export const db = {
   },
 
   // 🤖 Guarda o actualiza cualquier propiedad de cualquier bot en tiempo real
+  // 🛡️ Protección: nadie puede "bajar" al main (isMain: true -> false) salvo que sea forzado.
+  //    Esto evita que un subbot con un JID coincidente corrompa el registro del bot principal.
   setBot(jid, dataObject, force = false) {
+    const currentData = getBot(jid);
+
+    if (currentData.isMain === true && dataObject.isMain === false && !force) {
+      return;
+    }
+
     if (force) {
       stmts.updateBot.run(JSON.stringify(dataObject), jid);
     } else {
-      const currentData = getBot(jid);
       const updatedData = { ...currentData, ...dataObject };
       stmts.updateBot.run(JSON.stringify(updatedData), jid);
     }
   },
 
   // Retorna una lista con TODOS los bots registrados y sus objetos JSON limpios
+  // Incluye "id" además de "jid" para búsquedas explícitas por llave.
   getAllBots() {
     const rows = stmts.getAllBots.all();
     return rows.map(row => ({
+      id: row.jid,
       jid: row.jid,
       ...JSON.parse(row.data)
     }));
@@ -133,16 +137,14 @@ export const db = {
 
   // 🛡️ CONTROL DE ROLES: Verifica de forma prioritaria el config.js y luego la DB
   hasRole(jid, role) {
-    const numeroLimpio = jid.split('@')[0]; // Remueve el '@s.whatsapp.net' o '@g.us'
+    const numeroLimpio = jid.split('@')[0];
 
-    // 1. Validaciones globales prioritarias basadas en tu config.js
     const esOwnerGlobal = config.ownerNumber?.includes(numeroLimpio);
     const esCoOwnerGlobal = config.coOwners?.includes(numeroLimpio);
 
-    if (esOwnerGlobal) return true; // El owner principal tiene acceso total a todo rango
+    if (esOwnerGlobal) return true;
     if (esCoOwnerGlobal && hierarchy.indexOf("coowner") >= hierarchy.indexOf(role)) return true;
 
-    // 2. Si no es owner global por archivo, procedemos a evaluar los roles de la base de datos
     const user = getUser(jid);
     return hierarchy.indexOf(user.role) >= hierarchy.indexOf(role);
   },
