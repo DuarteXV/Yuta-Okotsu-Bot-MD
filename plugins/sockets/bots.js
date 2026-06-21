@@ -15,6 +15,9 @@ export default {
       return jid.split('@')[0].split(':')[0].replace(/\D/g, '')
     }
 
+    const esLabelAutomatico = (label) =>
+      label?.startsWith('SUB_') || label === 'Subbot' || label === 'MAIN'
+
     const subbotsActivos = db.getOnlineBots() || []
     const todosLosBots = db.getAllBots ? db.getAllBots() : []
 
@@ -33,8 +36,7 @@ export default {
     let listaFiltrada = []
     const numerosVistos = new Set()
 
-    // 2. Insertar SIEMPRE al Bot Principal real en el puesto #1 con su corona.
-    // El Main siempre se etiqueta como "MAIN", sin importar el config.botName.
+    // 2. Insertar SIEMPRE al Bot Principal real en el puesto #1 con su corona
     if (numeroMainReal) {
       listaFiltrada.push({
         label: 'MAIN',
@@ -45,18 +47,37 @@ export default {
       numerosVistos.add(numeroMainReal)
     }
 
-    // 3. Agregar el resto de subbots en línea, eliminando duplicados mediante el Set
+    // 3. Deduplicar subbots por número real.
+    // Un mismo número puede tener varios registros en la DB (basura de JIDs
+    // sucios o reconexiones viejas). Si hay más de uno, se prioriza siempre
+    // el que tenga un nombre personalizado (no automático) sobre el genérico.
+    const subbotsPorNumero = new Map()
+
     for (const sub of subbotsActivos) {
       const subNum = obtenerNumeroLimpio(sub.jid)
-      if (!subNum) continue
+      if (!subNum || subNum === numeroMainReal) continue
 
-      if (numerosVistos.has(subNum) || subNum === numeroMainReal) continue
+      const candidatoActual = subbotsPorNumero.get(subNum)
+
+      if (!candidatoActual) {
+        subbotsPorNumero.set(subNum, sub)
+        continue
+      }
+
+      const candidatoEsAutomatico = esLabelAutomatico(candidatoActual.label)
+      const nuevoEsAutomatico = esLabelAutomatico(sub.label)
+
+      // El nuevo gana solo si el actual es automático y el nuevo no lo es
+      if (candidatoEsAutomatico && !nuevoEsAutomatico) {
+        subbotsPorNumero.set(subNum, sub)
+      }
+    }
+
+    for (const [subNum, sub] of subbotsPorNumero) {
+      if (numerosVistos.has(subNum)) continue
       numerosVistos.add(subNum)
 
-      // Si el subbot nunca fue renombrado (sigue con su label automático),
-      // mostramos el nombre del bot (config.botName) en vez de la palabra "Subbot"
-      const esLabelAutomatico = sub.label?.startsWith('SUB_') || sub.label === 'Subbot' || sub.label === 'MAIN'
-      const nombreSub = esLabelAutomatico ? config.botName : sub.label
+      const nombreSub = esLabelAutomatico(sub.label) ? config.botName : sub.label
 
       listaFiltrada.push({
         label: nombreSub,
