@@ -28,14 +28,14 @@ async function getBannerBuffer(url) {
 }
 
 const catIcons = {
-  "info":     "🌀",
-  "misc":     "💠",
-  "dl":       "☁",
-  "grupos":   "❄",
+  "info":     "🔮",
+  "misc":     "⚜️",
+  "dl":       "🪐",
+  "grupos":   "💎",
   "owner":    "👑",
-  "utils":    "💫",
-  "stickers": "🪽",
-  "sockets":  "🪐",
+  "utils":    "🛠️",
+  "stickers": "🎭",
+  "sockets":  "🛰️",
 }
 
 export default {
@@ -46,7 +46,6 @@ export default {
 
   async run({ sock, from, senderNum, isGroup, groupName, usedPrefix, msg }) {
     try {
-      // Configuración de fecha y hora basada estrictamente en Colombia
       const timeZone = "America/Bogota";
       const ahora = new Date();
 
@@ -54,21 +53,9 @@ export default {
       const fecha   = ahora.toLocaleDateString("es-CO", { timeZone });
       const lugar   = isGroup ? groupName : "Chat Privado";
 
-      // Extraer la hora exacta para definir el saludo dinámico
-      const horaActual = parseInt(ahora.toLocaleTimeString("es-CO", { timeZone, hour: '2-digit', hour12: false }));
-      let saludo = "Buenas noches";
-
-      if (horaActual >= 5 && horaActual < 12) {
-        saludo = "Buenos días";
-      } else if (horaActual >= 12 && horaActual < 19) {
-        saludo = "Buenas tardes";
-      }
-
       const currentBotJid = sock.user?.id ? sock.user.id.split('@')[0].split(':')[0] + '@s.whatsapp.net' : '';
       const botData = db.getBot(currentBotJid);
 
-      // Si el bot (sea Main o subbot) nunca fue renombrado, usamos config.botName.
-      // Si tiene un nombre editado con .setname, respetamos ese nombre siempre.
       const esLabelAutomatico = botData?.label?.startsWith('SUB_') || botData?.label === 'Subbot' || botData?.label === 'MAIN'
       const nombreBot = (esLabelAutomatico || !botData?.label ? config.botName : botData.label).replace(/@\d+/g, '').trim();
 
@@ -88,29 +75,26 @@ export default {
         categories[cat].add(names[0])
       }
 
-      let textoMenu = `✨ ═══ 🫧 *${nombreBot.toUpperCase()}* 🫧 ═══ ✨\n`;
-      textoMenu += `👋 ¡${saludo} @${senderNum}, soy *${nombreBot}*!\n\n`;
-
-      textoMenu += `╔════ 🪐 *𝗦𝗜𝗦𝗧𝗘𝗠𝗔* 🪐 ════╗\n`;
-      textoMenu += `┃ 👤 *Usuario:* @${senderNum}\n`;
-      textoMenu += `┃ ⚙️ *Rango:* ${tipoBot}\n`;
-      textoMenu += `┃ 📍 *Canal:* ${lugar}\n`;
-      textoMenu += `┃ ⏰ *Hora:* ${horaStr}\n`;
-      textoMenu += `┃ 📅 *Fecha:* ${fecha}\n`;
-      textoMenu += `╚════════════════════════╝\n\n`;
-
-      textoMenu += `*📜  𝗟𝗜𝗦𝗧𝗔 𝗗𝗘 𝗖𝗢🇲𝗗𝗦* 📜\n`;
-      textoMenu += `_Usa el prefijo [ ${usedPrefix} ] antes de cada orden._\n\n`;
+      let textoMenu = `╭━━━━━━━━━━━━━━━━━━○\n`;
+      textoMenu += `│◇ \`ᴛɪᴘᴏ::\` ${tipoBot}\n`;
+      textoMenu += `│◇ \`sɪsᴛᴇᴍᴀ/ᴏᴘʀ::\` Android\n`;
+      textoMenu += `│◇ \`ᴜsᴇʀs::\` @${senderNum}\n`;
+      textoMenu += `│◇ \`ᴜʀʟ::\` ${linkMatch}\n`;
+      textoMenu += `╰━━━━━━━━━━━━━━━━━━○\n\n`;
 
       for (const [cat, cmds] of Object.entries(categories)) {
         const categoriaLimped = cat.toLowerCase().trim();
         const icon = catIcons[categoriaLimped] || "🎴";
-        const nombreFormateado = categoriaLimped.charAt(0).toUpperCase() + categoriaLimped.slice(1);
-        textoMenu += `${icon} ─── ❖ *꒰ ${nombreFormateado} ꒱* ❖ ─── ${icon}\n`;
+        const nombreFormateado = categoriaLimped.toUpperCase();
+        
+        textoMenu += `╭━━━━━━━━━━━━━━━━━━━━━━━○\n`;
+        textoMenu += `█°⿻︵ׄ  SECTOR│*${nombreFormateado}* ·°.•\n`;
+        
         for (const cmd of cmds) {
-          textoMenu += `✦ ${usedPrefix}${cmd}\n`;
+          textoMenu += `│˗ˋˏ𓍯 ꒰ 🪼 *${usedPrefix}${cmd}*\n`;
         }
-        textoMenu += "\n";
+        
+        textoMenu += `╰━━━━━━━━━━━━━━━━━━━━━━━⬣\n\n`;
       }
 
       textoMenu += `🪼 _Powered by DuarteXV | ${nombreBot}_\n`;
@@ -156,7 +140,7 @@ export default {
             forwardingScore: 1,
             forwardedNewsletterMessageInfo: {
               newsletterJid: "120363420979328566@newsletter",
-              newsletterName: "⏤͟͞ू⃪𝐁𝕃𝐔𝔼 𝐋𝕆𝐂𝕂 𝐂𝕃𝐔𝔹 𑁯🩵ᰍ",
+              newsletterName: "⏤͟͞ू⃪𝐁𝕃𝐔𝔼 𝐋𝕆𝐂𝕂 𝐂𝕃UZ 𑁯🩵ᰍ",
               serverMessageId: -1
             }
           }
