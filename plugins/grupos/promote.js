@@ -66,6 +66,9 @@ export default {
       }, { quoted: msg })
 
     } catch (e) {
+      if (e.message?.toLowerCase().includes('forbidden')) {
+        return await reply({ text: `❌ No se pudo promover al usuario: el bot no es admin del grupo.` })
+      }
       await reply({ text: `❌ No se pudo promover al usuario: ${e.message}` })
     }
   }
