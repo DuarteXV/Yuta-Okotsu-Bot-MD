@@ -36,10 +36,15 @@ export default {
     let listaFiltrada = []
     const numerosVistos = new Set()
 
-    // 2. Insertar SIEMPRE al Bot Principal real en el puesto #1 con su corona
+    // 2. Insertar SIEMPRE al Bot Principal real en el puesto #1 con su corona.
+    // El "Tipo" siempre dirá PRINCIPAL, pero el nombre sigue la misma regla
+    // que los subbots: si tiene label editado lo muestra, si no, usa config.botName.
     if (numeroMainReal) {
+      const datosMain = db.getBot(`${numeroMainReal}@s.whatsapp.net`) || db.getBot('main')
+      const nombreMain = esLabelAutomatico(datosMain?.label) ? config.botName : datosMain.label
+
       listaFiltrada.push({
-        label: 'MAIN',
+        label: nombreMain,
         jid: numeroMainReal,
         isMain: true
       })
@@ -67,7 +72,6 @@ export default {
       const candidatoEsAutomatico = esLabelAutomatico(candidatoActual.label)
       const nuevoEsAutomatico = esLabelAutomatico(sub.label)
 
-      // El nuevo gana solo si el actual es automático y el nuevo no lo es
       if (candidatoEsAutomatico && !nuevoEsAutomatico) {
         subbotsPorNumero.set(subNum, sub)
       }
@@ -86,8 +90,8 @@ export default {
       })
     }
 
-    // El encabezado SIEMPRE refleja al bot Principal -> "MAIN"
-    const nombreBotEncabezado = listaFiltrada[0]?.label || 'MAIN'
+    // El encabezado SIEMPRE refleja al bot Principal
+    const nombreBotEncabezado = listaFiltrada[0]?.label || config.botName
 
     // 4. Construcción del mensaje estético final
     let text = `✨ ═══ 🫧 *${nombreBotEncabezado.toUpperCase()}* 🫧 ═══ ✨\n`
