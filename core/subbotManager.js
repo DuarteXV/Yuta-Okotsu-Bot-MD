@@ -9,13 +9,24 @@ if (!fs.existsSync(SUBBOTS_DIR)) fs.mkdirSync(SUBBOTS_DIR, { recursive: true });
 
 export const activeBots = new Map();
 const workers = new Map();
-
 let mainSock = null;
+
+// 🧹 Quita el isMain de cualquier registro viejo que ya no sea el main actual.
+// Así, si cambiás de número de bot principal, el anterior queda como
+// un registro normal (no main) y no genera confusión en .bots
+function limpiarMainAnterior(jidNuevoMain) {
+  const todos = db.getAllBots ? db.getAllBots() : [];
+  for (const bot of todos) {
+    if (bot.isMain === true && bot.jid !== jidNuevoMain) {
+      db.setBot(bot.jid, { ...bot, isMain: false }, true);
+      log.info(`[MANAGER] Main anterior (${bot.jid}) desmarcado. Nuevo main: ${jidNuevoMain}`);
+    }
+  }
+}
 
 export function registerMainBot(sock, label = "MAIN") {
   mainSock = sock;
   const rawJid = sock.user?.id || "";
-  
   // Limpiamos el JID para que quede puro (ej: 595992349762@s.whatsapp.net)
   const jid = rawJid ? rawJid.split(":")[0].split("@")[0] + "@s.whatsapp.net" : "";
   const status = jid ? "online" : "connecting";
@@ -25,7 +36,8 @@ export function registerMainBot(sock, label = "MAIN") {
 
   // Si ya tenemos el JID del main listo, lo guardamos con su JID real como llave en la DB
   if (jid) {
-    db.setBot(jid, { label, jid, status, isMain: true });
+    limpiarMainAnterior(jid);
+    db.setBot(jid, { label, jid, status, isMain: true }, true);
     global.mainBotNum = jid.split("@")[0];
   }
 
@@ -36,10 +48,10 @@ export function registerMainBot(sock, label = "MAIN") {
         mainSock = sock;
         const currentRawJid = sock.user?.id || "";
         const currentJid = currentRawJid ? currentRawJid.split(":")[0].split("@")[0] + "@s.whatsapp.net" : "";
-
         if (currentJid) {
           activeBots.set("main", { label, jid: currentJid, status: "online", isMain: true });
-          db.setBot(currentJid, { label, jid: currentJid, status: "online", isMain: true });
+          limpiarMainAnterior(currentJid);
+          db.setBot(currentJid, { label, jid: currentJid, status: "online", isMain: true }, true);
           global.mainBotNum = currentJid.split("@")[0];
         }
       }
@@ -48,9 +60,18 @@ export function registerMainBot(sock, label = "MAIN") {
 }
 
 export function updateBotStatus(id, data) {
+  // 🛡️ Un subbot nunca puede pisar el registro del bot principal actual
+  if (id !== "main" && data.jid && global.mainBotNum) {
+    const dataNum = data.jid.split("@")[0];
+    if (dataNum === global.mainBotNum) {
+      log.warn(`[MANAGER] Subbot ${id} intentó reportar el JID del main (${dataNum}) — ignorado`);
+      return;
+    }
+  }
+
   const current = activeBots.get(id) || {};
   activeBots.set(id, { ...current, ...data });
-  
+
   if (data.jid) {
     db.setBot(data.jid, data);
   } else {
@@ -67,7 +88,7 @@ export function removeSubbot(id) {
 
   const botData = activeBots.get(id);
   activeBots.delete(id);
-  
+
   if (botData && botData.jid) {
     db.setBot(botData.jid, { status: "offline" });
   } else {
@@ -90,7 +111,7 @@ export function launchSubbot(id) {
   log.info(`[MANAGER] Lanzando subbot: ${id}`);
 
   const worker = new Worker("./core/subbotWorker.js", {
-    workerData: { id, sessionDir },
+    workerData: { id, sessionDir, mainBotNum: global.mainBotNum },
   });
 
   workers.set(id, worker);
@@ -105,6 +126,7 @@ export function launchSubbot(id) {
         isMain: false
       });
     }
+
     if (msg.type === "logged_out") {
       log.warn(`[MANAGER] Subbot ${id} cerró sesión — eliminando...`);
       removeSubbot(id);
@@ -146,7 +168,7 @@ export async function requestSubbotCode(id, phoneNumber, sock, from) {
     }
 
     const worker = new Worker("./core/subbotWorker.js", {
-      workerData: { id, sessionDir, phoneNumber },
+      workerData: { id, sessionDir, phoneNumber, mainBotNum: global.mainBotNum },
     });
 
     workers.set(id, worker);
@@ -168,28 +190,27 @@ export async function requestSubbotCode(id, phoneNumber, sock, from) {
         clearTimeout(timeout);
         resolve(msg.code);
       }
+
       if (msg.type === "status") {
         const subJid = msg.jid ? msg.jid.split(":")[0].split("@")[0] + "@s.whatsapp.net" : null;
-        
         updateBotStatus(id, {
           jid: subJid,
           status: msg.status,
           label: id.toUpperCase(),
           isMain: false
         });
-        
+
         if (msg.status === "online") {
           clearTimeout(cleanupTimeout);
-
           const userNum = id.replace("sub_", "");
           const userJid = subJid || `${userNum}@s.whatsapp.net`;
-
           sock.sendMessage(userJid, {
             text: "📍 *Has vinculado un subbot con éxito*\n" +
-                  "> • Puedes usar *.delbot* para desvincularlo cuando quieras."
+              "> • Puedes usar *.delbot* para desvincularlo cuando quieras."
           }).catch(e => log.error(`[MANAGER] Error enviando mensaje de éxito: ${e.message}`));
         }
       }
+
       if (msg.type === "logged_out") {
         clearTimeout(cleanupTimeout);
         removeSubbot(id);
@@ -224,11 +245,13 @@ export async function requestSubbotCode(id, phoneNumber, sock, from) {
 
 export function launchAllSubbots() {
   if (!fs.existsSync(SUBBOTS_DIR)) return;
+
   const dirs = fs.readdirSync(SUBBOTS_DIR, { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .map((e) => e.name);
 
   if (dirs.length === 0) return;
+
   log.info(`[MANAGER] Relanzando ${dirs.length} subbot(s)...`);
   for (const id of dirs) launchSubbot(id);
 }
