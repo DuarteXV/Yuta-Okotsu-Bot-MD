@@ -13,7 +13,7 @@ export default {
 
     if (!quoted?.stanzaId) {
       return await reply({
-        text: "❌ Responde al mensaje que quieres eliminar."
+        text: "『✖️』Rᥱs⍴onძᧉ ⍺Ɩ ᴍᧉn𝗌⍺jᧉ qᥙᧉ qᥙіᧉꭇᧉ𝗌 ᧉƖіmіn⍺ꭇ."
       });
     }
 
