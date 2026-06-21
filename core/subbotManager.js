@@ -24,6 +24,12 @@ function limpiarMainAnterior(jidNuevoMain) {
   }
 }
 
+// 🏷️ Determina si un bot ya tiene un nombre propio (editado con .setname)
+// que NO debe pisarse con el label automático tipo SUB_XXXXXXX
+function tieneNombrePropio(datos) {
+  return !!(datos?.label && !datos.label.startsWith('SUB_') && datos.label !== 'Subbot' && datos.label !== 'MAIN');
+}
+
 export function registerMainBot(sock, label = "MAIN") {
   mainSock = sock;
   const rawJid = sock.user?.id || "";
@@ -119,10 +125,17 @@ export function launchSubbot(id) {
   worker.on("message", (msg) => {
     if (msg.type === "status") {
       const subJid = msg.jid ? msg.jid.split(":")[0].split("@")[0] + "@s.whatsapp.net" : null;
+
+      // 🏷️ No pisamos el label si el bot ya tiene un nombre propio
+      // guardado (ej: editado con .setname). Solo se asigna el label
+      // automático cuando todavía no tiene ninguno personalizado.
+      const datosExistentes = subJid ? db.getBot(subJid) : null;
+      const conservarNombre = tieneNombrePropio(datosExistentes);
+
       updateBotStatus(id, {
         jid: subJid,
         status: msg.status,
-        label: id.toUpperCase(),
+        ...(conservarNombre ? {} : { label: id.toUpperCase() }),
         isMain: false
       });
     }
@@ -193,10 +206,15 @@ export async function requestSubbotCode(id, phoneNumber, sock, from) {
 
       if (msg.type === "status") {
         const subJid = msg.jid ? msg.jid.split(":")[0].split("@")[0] + "@s.whatsapp.net" : null;
+
+        // 🏷️ Misma protección: no pisar el nombre propio si ya existe
+        const datosExistentes = subJid ? db.getBot(subJid) : null;
+        const conservarNombre = tieneNombrePropio(datosExistentes);
+
         updateBotStatus(id, {
           jid: subJid,
           status: msg.status,
-          label: id.toUpperCase(),
+          ...(conservarNombre ? {} : { label: id.toUpperCase() }),
           isMain: false
         });
 
