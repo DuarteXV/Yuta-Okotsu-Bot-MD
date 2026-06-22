@@ -6,10 +6,6 @@ import { db } from "../database/db.js";
 const groupCache = new Map();
 const prefixes = Array.isArray(config.prefix) ? config.prefix : [config.prefix];
 
-// 🔄 Permite invalidar el cache de un grupo específico desde fuera de este
-// módulo (por ejemplo, cuando Baileys dispara "group-participants.update"
-// tras un promote/demote/kick/add). Así los comandos adminOnly nunca leen
-// datos viejos de quién es admin.
 export function invalidateGroupCache(groupJid) {
   groupCache.delete(groupJid);
 }
@@ -190,7 +186,16 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN", mainBotNum 
       log.cmdExec({ cmdName, sender: senderNum, success: false, ms: Date.now() - start, botLabel });
       log.error(`Comando ${cmdName}: ${e.message}`);
       await ctx.react("❌");
-      await ctx.reply({ text: `❌ Error ejecutando \`${cmdName}\`:\n${e.message}` });
+
+      // 🛡️ Cualquier error "forbidden" que llegue de WhatsApp (acciones que
+      // requieren que el bot sea admin: promote/demote/kick/etc.) se traduce
+      // a un mensaje claro y único para todos los plugins, sin que cada uno
+      // tenga que repetir esta detección por su cuenta.
+      if (e.message?.toLowerCase().includes('forbidden')) {
+        await ctx.reply({ text: `❌ No se pudo completar la acción: el bot necesita ser administrador del grupo.` });
+      } else {
+        await ctx.reply({ text: `❌ Error ejecutando \`${cmdName}\`:\n${e.message}` });
+      }
     }
   } catch (e) {
     log.error(`handleMessage: ${e.message}`);
