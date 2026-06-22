@@ -11,9 +11,6 @@ export const activeBots = new Map();
 const workers = new Map();
 let mainSock = null;
 
-// 🧹 Quita el isMain de cualquier registro viejo que ya no sea el main actual.
-// Así, si cambiás de número de bot principal, el anterior queda como
-// un registro normal (no main) y no genera confusión en .bots
 function limpiarMainAnterior(jidNuevoMain) {
   const todos = db.getAllBots ? db.getAllBots() : [];
   for (const bot of todos) {
@@ -24,30 +21,35 @@ function limpiarMainAnterior(jidNuevoMain) {
   }
 }
 
-// 🏷️ Determina si un bot ya tiene un nombre propio (editado con .setname)
-// que NO debe pisarse con el label automático tipo SUB_XXXXXXX
 function tieneNombrePropio(datos) {
   return !!(datos?.label && !datos.label.startsWith('SUB_') && datos.label !== 'Subbot' && datos.label !== 'MAIN');
+}
+
+// 📸 Devuelve un snapshot plano y actualizado de TODOS los bots activos en
+// memoria (Main + subbots), sin pasar por la DB. Esta es la fuente de
+// verdad real de quién está conectado AHORA MISMO, igual que usa la consola.
+export function getActiveBotsSnapshot() {
+  const snapshot = [];
+  for (const [key, value] of activeBots.entries()) {
+    snapshot.push({ id: key, ...value });
+  }
+  return snapshot;
 }
 
 export function registerMainBot(sock, label = "MAIN") {
   mainSock = sock;
   const rawJid = sock.user?.id || "";
-  // Limpiamos el JID para que quede puro (ej: 595992349762@s.whatsapp.net)
   const jid = rawJid ? rawJid.split(":")[0].split("@")[0] + "@s.whatsapp.net" : "";
   const status = jid ? "online" : "connecting";
 
-  // Guardamos en la lista local en memoria
   activeBots.set("main", { label, jid, status, isMain: true });
 
-  // Si ya tenemos el JID del main listo, lo guardamos con su JID real como llave en la DB
   if (jid) {
     limpiarMainAnterior(jid);
     db.setBot(jid, { label, jid, status, isMain: true }, true);
     global.mainBotNum = jid.split("@")[0];
   }
 
-  // Si aún está conectando, esperamos a que abra el evento para registrarlo con su JID real
   if (!jid) {
     sock.ev.on("connection.update", ({ connection }) => {
       if (connection === "open") {
@@ -63,10 +65,21 @@ export function registerMainBot(sock, label = "MAIN") {
       }
     });
   }
+
+  // Mantener activeBots sincronizado con la conexión real del Main
+  sock.ev.on("connection.update", ({ connection }) => {
+    if (connection === "open") {
+      const current = activeBots.get("main") || {};
+      activeBots.set("main", { ...current, status: "online" });
+    }
+    if (connection === "close") {
+      const current = activeBots.get("main") || {};
+      activeBots.set("main", { ...current, status: "offline" });
+    }
+  });
 }
 
 export function updateBotStatus(id, data) {
-  // 🛡️ Un subbot nunca puede pisar el registro del bot principal actual
   if (id !== "main" && data.jid && global.mainBotNum) {
     const dataNum = data.jid.split("@")[0];
     if (dataNum === global.mainBotNum) {
@@ -123,12 +136,14 @@ export function launchSubbot(id) {
   workers.set(id, worker);
 
   worker.on("message", (msg) => {
+    if (msg.type === "request_bots_list") {
+      worker.postMessage({ type: "bots_list", data: getActiveBotsSnapshot() });
+      return;
+    }
+
     if (msg.type === "status") {
       const subJid = msg.jid ? msg.jid.split(":")[0].split("@")[0] + "@s.whatsapp.net" : null;
 
-      // 🏷️ No pisamos el label si el bot ya tiene un nombre propio
-      // guardado (ej: editado con .setname). Solo se asigna el label
-      // automático cuando todavía no tiene ninguno personalizado.
       const datosExistentes = subJid ? db.getBot(subJid) : null;
       const conservarNombre = tieneNombrePropio(datosExistentes);
 
@@ -199,6 +214,11 @@ export async function requestSubbotCode(id, phoneNumber, sock, from) {
     }, 2 * 60 * 1000);
 
     worker.on("message", (msg) => {
+      if (msg.type === "request_bots_list") {
+        worker.postMessage({ type: "bots_list", data: getActiveBotsSnapshot() });
+        return;
+      }
+
       if (msg.type === "code") {
         clearTimeout(timeout);
         resolve(msg.code);
@@ -207,7 +227,6 @@ export async function requestSubbotCode(id, phoneNumber, sock, from) {
       if (msg.type === "status") {
         const subJid = msg.jid ? msg.jid.split(":")[0].split("@")[0] + "@s.whatsapp.net" : null;
 
-        // 🏷️ Misma protección: no pisar el nombre propio si ya existe
         const datosExistentes = subJid ? db.getBot(subJid) : null;
         const conservarNombre = tieneNombrePropio(datosExistentes);
 
