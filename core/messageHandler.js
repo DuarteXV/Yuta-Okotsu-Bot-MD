@@ -120,7 +120,12 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN", mainBotNum 
 
     const plugins = getPlugins();
     const plugin = plugins.get(cmdName);
-    if (!plugin) return;
+
+    if (!plugin) {
+      return await sock.sendMessage(from, {
+        text: `✖️ EƖ ᥴoᴍanძo "*${usedPrefix}${cmdName}*" ɴo ᧉxı𝗌ƚᧉ o ᧉ𝗌ƚ⍺ m⍺Ɩ ᧉsᥴꭇiƚo.\n> usa *.help* para ver la lista de comandos.`
+      }, { quoted: msg });
+    }
 
     const ctx = {
       sock,
@@ -187,10 +192,6 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN", mainBotNum 
       log.error(`Comando ${cmdName}: ${e.message}`);
       await ctx.react("❌");
 
-      // 🛡️ Cualquier error "forbidden" que llegue de WhatsApp (acciones que
-      // requieren que el bot sea admin: promote/demote/kick/etc.) se traduce
-      // a un mensaje claro y único para todos los plugins, sin que cada uno
-      // tenga que repetir esta detección por su cuenta.
       if (e.message?.toLowerCase().includes('forbidden')) {
         await ctx.reply({ text: `❌ No se pudo completar la acción: el bot necesita ser administrador del grupo.` });
       } else {
