@@ -17,18 +17,20 @@ async function subirDix(buffer, filename, mimetype) {
     maxContentLength: Infinity,
     headers: { 'User-Agent': 'Drive-Client' }
   })
+
   return data
 }
 
 export default {
   name: ['setbanner', 'cambiarbanner'],
-  description: 'Cambia el banner de un subbot específico',
+  description: 'Cambia el banner de un subbot o del bot principal',
   category: 'owner',
   ownerOnly: false,
 
   async run({ sock, from, msg, reply }) {
     try {
       const cleanJid = (id) => id ? id.split('@')[0].split(':')[0] + '@s.whatsapp.net' : ''
+
       const senderJid = cleanJid(msg.key.participant || msg.participant || from)
       const currentBotJid = cleanJid(sock.user?.id)
 
@@ -51,6 +53,7 @@ export default {
       if (esOwnerGlobal) {
         const mentioned = quotedContext?.mentionedJid || []
         const targetRaw = quotedContext?.participant || mentioned[0]
+
         if (targetRaw) {
           targetBotJid = cleanJid(targetRaw)
         } else {
@@ -60,21 +63,17 @@ export default {
         targetBotJid = currentBotJid
       }
 
-      const mainBotJid = cleanJid(sock.user?.id) 
-      const esSubbotTarget = db.getAllBots().some(b => cleanJid(b.jid) === targetBotJid)
+      const esBotRegistrado = db.getAllBots().some(b => cleanJid(b.jid) === targetBotJid)
 
-      if (esOwnerGlobal && targetBotJid === mainBotJid && !esSubbotTarget) {
-        return await reply({ text: '❌ Este comando está restringido solo para subbots. No puedes cambiar el banner del bot principal desde aquí.' })
-      }
-
-      if (esOwnerGlobal && !esSubbotTarget && targetBotJid !== currentBotJid) {
-        return await reply({ text: '❌ El usuario seleccionado no está registrado como un subbot activo en la base de datos.' })
+      if (esOwnerGlobal && !esBotRegistrado && targetBotJid !== currentBotJid) {
+        return await reply({ text: '❌ El usuario seleccionado no está registrado como un bot (principal o subbot) en la base de datos.' })
       }
 
       const msgType = rawMessage?.imageMessage ? 'imageMessage' : null
       const quotedType = quotedMessage?.imageMessage ? 'imageMessage' : null
 
       let targetMsg = null
+
       if (msgType) {
         targetMsg = msg
       } else if (quotedMessage && quotedType) {
@@ -101,6 +100,7 @@ export default {
       const filename = `banner_${Date.now()}.${ext}`
 
       const uploadResult = await subirDix(buffer, filename, mime)
+
       if (!uploadResult || !uploadResult.status || !uploadResult.data?.url) {
         throw new Error('El servidor de Dix rechazó la subida.')
       }
@@ -109,8 +109,7 @@ export default {
 
       db.setBot(targetBotJid, { banner: bannerUrl })
 
-      await reply({ text: `✅ *Banner actualizado con éxito*\n\n🤖 *Subbot:* @${targetBotJid.split('@')[0]}\n🔗 *URL del Banner:* \n${bannerUrl}`, mentions: [targetBotJid] })
-
+      await reply({ text: `✅ *Banner actualizado con éxito*\n\n🤖 *Bot:* @${targetBotJid.split('@')[0]}\n🔗 *URL del Banner:* \n${bannerUrl}`, mentions: [targetBotJid] })
     } catch (err) {
       console.error(err)
       await reply({ text: `❌ *Error:* ${err.message}` })
