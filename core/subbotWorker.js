@@ -19,6 +19,24 @@ const { id, sessionDir, phoneNumber, mainBotNum } = workerData;
 const logger = pino({ level: "silent" });
 let pluginsLoaded = false;
 
+// 📸 Cache local de la lista de bots activos, actualizada por el manager
+let activeBotsLive = [];
+
+parentPort.on("message", (msg) => {
+  if (msg.type === "bots_list") {
+    activeBotsLive = msg.data || [];
+  }
+});
+
+function requestBotsList() {
+  parentPort.postMessage({ type: "request_bots_list" });
+}
+
+// Pedimos la lista periódicamente para mantenerla razonablemente fresca
+// sin saturar de mensajes al manager
+setInterval(requestBotsList, 5000);
+requestBotsList();
+
 async function useSQLiteAuthState(sessionDir) {
   if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir, { recursive: true });
@@ -98,7 +116,7 @@ async function startWorker(_attempt = 0) {
   async function flushPending() {
     const queue = pendingMessages.splice(0);
     for (const msg of queue) {
-      handleMessage(sock, msg, id.toUpperCase(), mainBotNum).catch(() => {});
+      handleMessage(sock, msg, id.toUpperCase(), mainBotNum, activeBotsLive).catch(() => {});
     }
   }
 
@@ -142,7 +160,6 @@ async function startWorker(_attempt = 0) {
     if (connection === "open") {
       connected = true;
 
-      // Limpieza rigurosa antes de mandar el JID al hilo principal
       const rawJid = sock.user?.id || "";
       const jidLimpio = rawJid ? rawJid.split(":")[0].split("@")[0] + "@s.whatsapp.net" : "";
       lastKnownJid = jidLimpio;
@@ -160,10 +177,6 @@ async function startWorker(_attempt = 0) {
       connected = false;
       const statusCode = lastDisconnect?.error?.output?.statusCode;
 
-      // 🛡️ Reportamos el ÚLTIMO jid conocido (no vacío), así el manager
-      // puede marcar como offline el registro correcto en la DB. Antes,
-      // mandar jid: "" hacía que el offline se guardara bajo otra llave,
-      // dejando el registro real eternamente como "online".
       parentPort.postMessage({ type: "status", status: "offline", jid: lastKnownJid });
 
       try { closeDb(); } catch {}
@@ -201,7 +214,7 @@ async function startWorker(_attempt = 0) {
         return;
       }
 
-      handleMessage(sock, msg, id.toUpperCase(), mainBotNum).catch(() => {});
+      handleMessage(sock, msg, id.toUpperCase(), mainBotNum, activeBotsLive).catch(() => {});
     }
   });
 }
