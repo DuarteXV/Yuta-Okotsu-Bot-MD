@@ -3,11 +3,11 @@ import config from '../../config.js'
 
 export default {
   name: ['bots', 'listbots'],
-  description: 'Muestra la lista de bots conectados filtrando duplicados de la base de datos',
+  description: 'Muestra la lista de bots realmente conectados ahora mismo',
   category: 'sockets',
   ownerOnly: false,
 
-  async run({ sock, react, reply, mainBotNum }) {
+  async run({ sock, react, reply, mainBotNum, activeBotsLive }) {
     await react('🤖')
 
     const obtenerNumeroLimpio = (jid) => {
@@ -18,7 +18,11 @@ export default {
     const esLabelAutomatico = (label) =>
       label?.startsWith('SUB_') || label === 'Subbot' || label === 'MAIN'
 
-    const subbotsActivos = db.getOnlineBots() || []
+    // 📸 Fuente de verdad EN VIVO: lo que reporta activeBots del manager,
+    // no la DB. Solo se consideran "online" los que están en este snapshot.
+    const liveSnapshot = Array.isArray(activeBotsLive) ? activeBotsLive : []
+    const liveOnline = liveSnapshot.filter(b => b.status === 'online')
+
     const todosLosBots = db.getAllBots ? db.getAllBots() : []
 
     // 1. Determinar el número del verdadero Bot Principal
@@ -36,9 +40,7 @@ export default {
     let listaFiltrada = []
     const numerosVistos = new Set()
 
-    // 2. Insertar SIEMPRE al Bot Principal real en el puesto #1 con su corona.
-    // El "Tipo" siempre dirá PRINCIPAL, pero el nombre sigue la misma regla
-    // que los subbots: si tiene label editado lo muestra, si no, usa config.botName.
+    // 2. Insertar SIEMPRE al Bot Principal real en el puesto #1
     if (numeroMainReal) {
       const datosMain = db.getBot(`${numeroMainReal}@s.whatsapp.net`) || db.getBot('main')
       const nombreMain = esLabelAutomatico(datosMain?.label) ? config.botName : datosMain.label
@@ -52,48 +54,30 @@ export default {
       numerosVistos.add(numeroMainReal)
     }
 
-    // 3. Deduplicar subbots por número real.
-    // Un mismo número puede tener varios registros en la DB (basura de JIDs
-    // sucios o reconexiones viejas). Si hay más de uno, se prioriza siempre
-    // el que tenga un nombre personalizado (no automático) sobre el genérico.
-    const subbotsPorNumero = new Map()
-
-    for (const sub of subbotsActivos) {
-      const subNum = obtenerNumeroLimpio(sub.jid)
+    // 3. Recorrer SOLO los subbots que el snapshot en vivo confirma como online.
+    // El nombre se busca en la DB (para reflejar ediciones con .setname),
+    // pero la decisión de "¿está online?" depende exclusivamente del snapshot.
+    for (const liveBot of liveOnline) {
+      const subNum = obtenerNumeroLimpio(liveBot.jid)
       if (!subNum || subNum === numeroMainReal) continue
-
-      const candidatoActual = subbotsPorNumero.get(subNum)
-
-      if (!candidatoActual) {
-        subbotsPorNumero.set(subNum, sub)
-        continue
-      }
-
-      const candidatoEsAutomatico = esLabelAutomatico(candidatoActual.label)
-      const nuevoEsAutomatico = esLabelAutomatico(sub.label)
-
-      if (candidatoEsAutomatico && !nuevoEsAutomatico) {
-        subbotsPorNumero.set(subNum, sub)
-      }
-    }
-
-    for (const [subNum, sub] of subbotsPorNumero) {
       if (numerosVistos.has(subNum)) continue
       numerosVistos.add(subNum)
 
-      const nombreSub = esLabelAutomatico(sub.label) ? config.botName : sub.label
+      const datosDb = db.getBot(`${subNum}@s.whatsapp.net`)
+      const labelCandidato = (datosDb?.label && !esLabelAutomatico(datosDb.label))
+        ? datosDb.label
+        : (liveBot.label && !esLabelAutomatico(liveBot.label) ? liveBot.label : config.botName)
 
       listaFiltrada.push({
-        label: nombreSub,
+        label: labelCandidato,
         jid: subNum,
         isMain: false
       })
     }
 
-    // El encabezado SIEMPRE refleja al bot Principal
     const nombreBotEncabezado = listaFiltrada[0]?.label || config.botName
 
-    // 4. Construcción del mensaje estético final
+    // 4. Construcción del mensaje final
     let text = `✨ ═══ 🫧 *${nombreBotEncabezado.toUpperCase()}* 🫧 ═══ ✨\n`
     text += `🤖 _Bots conectados al sistema_\n\n`
 
