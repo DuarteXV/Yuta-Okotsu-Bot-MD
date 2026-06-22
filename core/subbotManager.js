@@ -25,15 +25,22 @@ function tieneNombrePropio(datos) {
   return !!(datos?.label && !datos.label.startsWith('SUB_') && datos.label !== 'Subbot' && datos.label !== 'MAIN');
 }
 
-// 📸 Devuelve un snapshot plano y actualizado de TODOS los bots activos en
-// memoria (Main + subbots), sin pasar por la DB. Esta es la fuente de
-// verdad real de quién está conectado AHORA MISMO, igual que usa la consola.
 export function getActiveBotsSnapshot() {
   const snapshot = [];
   for (const [key, value] of activeBots.entries()) {
     snapshot.push({ id: key, ...value });
   }
   return snapshot;
+}
+
+// 📡 Avisa a TODOS los workers activos el estado actual, una sola vez por
+// cambio real (no por intervalo). Esto es mucho más liviano que el polling:
+// solo se manda algo cuando alguien se conecta/desconecta de verdad.
+function broadcastBotsList() {
+  const snapshot = getActiveBotsSnapshot();
+  for (const worker of workers.values()) {
+    worker.postMessage({ type: "bots_list", data: snapshot });
+  }
 }
 
 export function registerMainBot(sock, label = "MAIN") {
@@ -43,6 +50,7 @@ export function registerMainBot(sock, label = "MAIN") {
   const status = jid ? "online" : "connecting";
 
   activeBots.set("main", { label, jid, status, isMain: true });
+  broadcastBotsList();
 
   if (jid) {
     limpiarMainAnterior(jid);
@@ -58,6 +66,7 @@ export function registerMainBot(sock, label = "MAIN") {
         const currentJid = currentRawJid ? currentRawJid.split(":")[0].split("@")[0] + "@s.whatsapp.net" : "";
         if (currentJid) {
           activeBots.set("main", { label, jid: currentJid, status: "online", isMain: true });
+          broadcastBotsList();
           limpiarMainAnterior(currentJid);
           db.setBot(currentJid, { label, jid: currentJid, status: "online", isMain: true }, true);
           global.mainBotNum = currentJid.split("@")[0];
@@ -66,15 +75,16 @@ export function registerMainBot(sock, label = "MAIN") {
     });
   }
 
-  // Mantener activeBots sincronizado con la conexión real del Main
   sock.ev.on("connection.update", ({ connection }) => {
     if (connection === "open") {
       const current = activeBots.get("main") || {};
       activeBots.set("main", { ...current, status: "online" });
+      broadcastBotsList();
     }
     if (connection === "close") {
       const current = activeBots.get("main") || {};
       activeBots.set("main", { ...current, status: "offline" });
+      broadcastBotsList();
     }
   });
 }
@@ -90,6 +100,7 @@ export function updateBotStatus(id, data) {
 
   const current = activeBots.get(id) || {};
   activeBots.set(id, { ...current, ...data });
+  broadcastBotsList();
 
   if (data.jid) {
     db.setBot(data.jid, data);
@@ -107,6 +118,7 @@ export function removeSubbot(id) {
 
   const botData = activeBots.get(id);
   activeBots.delete(id);
+  broadcastBotsList();
 
   if (botData && botData.jid) {
     db.setBot(botData.jid, { status: "offline" });
@@ -135,12 +147,11 @@ export function launchSubbot(id) {
 
   workers.set(id, worker);
 
-  worker.on("message", (msg) => {
-    if (msg.type === "request_bots_list") {
-      worker.postMessage({ type: "bots_list", data: getActiveBotsSnapshot() });
-      return;
-    }
+  // En cuanto el worker está listo, le mandamos el snapshot actual
+  // (sin esperar a que pregunte nada)
+  worker.postMessage({ type: "bots_list", data: getActiveBotsSnapshot() });
 
+  worker.on("message", (msg) => {
     if (msg.type === "status") {
       const subJid = msg.jid ? msg.jid.split(":")[0].split("@")[0] + "@s.whatsapp.net" : null;
 
@@ -172,6 +183,7 @@ export function launchSubbot(id) {
     } else {
       const botData = activeBots.get(id);
       activeBots.delete(id);
+      broadcastBotsList();
       if (botData && botData.jid) {
         db.setBot(botData.jid, { status: "offline" });
       } else {
@@ -200,6 +212,7 @@ export async function requestSubbotCode(id, phoneNumber, sock, from) {
     });
 
     workers.set(id, worker);
+    worker.postMessage({ type: "bots_list", data: getActiveBotsSnapshot() });
 
     const timeout = setTimeout(() => {
       reject(new Error("Timeout esperando código"));
@@ -214,11 +227,6 @@ export async function requestSubbotCode(id, phoneNumber, sock, from) {
     }, 2 * 60 * 1000);
 
     worker.on("message", (msg) => {
-      if (msg.type === "request_bots_list") {
-        worker.postMessage({ type: "bots_list", data: getActiveBotsSnapshot() });
-        return;
-      }
-
       if (msg.type === "code") {
         clearTimeout(timeout);
         resolve(msg.code);
@@ -264,6 +272,7 @@ export async function requestSubbotCode(id, phoneNumber, sock, from) {
       } else {
         const botData = activeBots.get(id);
         activeBots.delete(id);
+        broadcastBotsList();
         if (botData && botData.jid) {
           db.setBot(botData.jid, { status: "offline" });
         } else {
