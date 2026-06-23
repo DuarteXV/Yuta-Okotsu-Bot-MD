@@ -158,12 +158,43 @@ export async function createConnection({
   let connectionTimeout;
   let connected = false;
   let pendingMessages = [];
+  let lastActivity = Date.now();
+  let watchdogInterval = null;
 
   function clearConnTimeout() {
     if (connectionTimeout) {
       clearTimeout(connectionTimeout);
       connectionTimeout = null;
     }
+  }
+
+  function clearWatchdog() {
+    if (watchdogInterval) {
+      clearInterval(watchdogInterval);
+      watchdogInterval = null;
+    }
+  }
+
+  // 🛡️ Watchdog: si la conexión está "abierta" según el estado interno,
+  // pero no hay NINGUNA señal de actividad real del socket (mensajes,
+  // refresco de credenciales, cambios de grupo, etc.) por demasiado
+  // tiempo, asumimos que el socket quedó en estado "zombie" (conectado
+  // en apariencia pero sordo) y forzamos una reconexión real.
+  // Costo: una comparación numérica simple cada 60s — sin impacto
+  // perceptible en CPU/RAM.
+  function startWatchdog() {
+    clearWatchdog();
+    const UMBRAL_INACTIVIDAD = 10 * 60 * 1000; // 10 minutos sin ninguna señal
+
+    watchdogInterval = setInterval(() => {
+      if (!connected) return;
+      const inactivo = Date.now() - lastActivity;
+      if (inactivo > UMBRAL_INACTIVIDAD) {
+        log.warn(`[${botLabel}] 🐶 Watchdog: sin actividad por ${Math.round(inactivo / 1000)}s, forzando reconexión...`);
+        clearWatchdog();
+        try { sock.end(new Error("watchdog: socket inactivo")); } catch {}
+      }
+    }, 60 * 1000);
   }
 
   async function flushPending() {
@@ -236,12 +267,15 @@ export async function createConnection({
     if (connection === "open") {
       clearConnTimeout();
       connected = true;
+      lastActivity = Date.now();
+      startWatchdog();
       log.ok(`[${botLabel}] ✅ Conectado → ${sock.user?.id}`);
       await flushPending();
     }
 
     if (connection === "close") {
       clearConnTimeout();
+      clearWatchdog();
       connected = false;
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const errorMsg = lastDisconnect?.error?.message || "Desconocido";
@@ -280,14 +314,19 @@ export async function createConnection({
     log.error(`[${botLabel}] WS error: ${err?.message || err}`);
   });
 
-  sock.ev.on("creds.update", saveCreds);
+  sock.ev.on("creds.update", () => {
+    lastActivity = Date.now();
+    saveCreds();
+  });
 
   sock.ev.on("group-participants.update", ({ id }) => {
+    lastActivity = Date.now();
     invalidateGroupCache(id);
     log.info(`[${botLabel}] Cache de grupo invalidado por cambio de participantes → ${id}`);
   });
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
+    lastActivity = Date.now();
     if (type !== "notify") return;
 
     for (const msg of messages) {
@@ -296,7 +335,7 @@ export async function createConnection({
 
       if (!connected) {
         pendingMessages.push({ msg, label: botLabel });
-        return;
+        continue;
       }
 
       handleMessage(sock, msg, botLabel, null, getActiveBotsSnapshot()).catch((e) =>
