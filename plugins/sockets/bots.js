@@ -14,8 +14,6 @@ export default {
       const limpiarNumero = (jid = '') =>
         jid.split('@')[0].split(':')[0].replace(/\D/g, '')
 
-      const numeroPrincipal = limpiarNumero(sock.user?.id)
-
       const obtenerNombre = (numero) => {
         try {
           const bot = db.getBot(`${numero}@s.whatsapp.net`)
@@ -35,6 +33,13 @@ export default {
         }
       }
 
+      const todosLosBots = db.getAllBots ? db.getAllBots() : []
+      const registroMain = todosLosBots.find(b => (b.isMain === true || b.isMain === 1) && b.jid)
+
+      const numeroPrincipal = registroMain
+        ? limpiarNumero(registroMain.jid)
+        : (global.mainBotNum || limpiarNumero(sock.user?.id))
+
       const nombrePrincipal = obtenerNombre(numeroPrincipal)
 
       const subbotsDir = './sessions/subbots'
@@ -48,6 +53,7 @@ export default {
           .map(dir => dir.name)
           .filter(name => name.startsWith('sub_'))
           .map(name => name.replace('sub_', ''))
+          .filter(numero => numero !== numeroPrincipal)
       }
 
       let text = `✨ ═══ 🫧 *${nombrePrincipal.toUpperCase()}* 🫧 ═══ ✨\n`
