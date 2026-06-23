@@ -18,14 +18,8 @@ export default {
     const esLabelAutomatico = (label) =>
       label?.startsWith('SUB_') || label === 'Subbot' || label === 'MAIN'
 
-    // 📸 Fuente de verdad EN VIVO: lo que reporta activeBots del manager,
-    // no la DB. Solo se consideran "online" los que están en este snapshot.
-    const liveSnapshot = Array.isArray(activeBotsLive) ? activeBotsLive : []
-    const liveOnline = liveSnapshot.filter(b => b.status === 'online')
-
-    const todosLosBots = db.getAllBots ? db.getAllBots() : []
-
     // 1. Determinar el número del verdadero Bot Principal
+    const todosLosBots = db.getAllBots ? db.getAllBots() : []
     let numeroMainReal = null
 
     if (mainBotNum) {
@@ -43,7 +37,7 @@ export default {
     // 2. Insertar SIEMPRE al Bot Principal real en el puesto #1
     if (numeroMainReal) {
       const datosMain = db.getBot(`${numeroMainReal}@s.whatsapp.net`) || db.getBot('main')
-      const nombreMain = esLabelAutomatico(datosMain?.label) ? config.botName : datosMain.label
+      const nombreMain = esLabelAutomatico(datosMain?.label) ? config.botName : (datosMain?.label || config.botName)
 
       listaFiltrada.push({
         label: nombreMain,
@@ -54,11 +48,16 @@ export default {
       numerosVistos.add(numeroMainReal)
     }
 
-    // 3. Recorrer SOLO los subbots que el snapshot en vivo confirma como online.
-    // El nombre se busca en la DB (para reflejar ediciones con .setname),
-    // pero la decisión de "¿está online?" depende exclusivamente del snapshot.
-    for (const liveBot of liveOnline) {
-      const subNum = obtenerNumeroLimpio(liveBot.jid)
+    // 3. Obtener la lista de subbots (Snapshot en vivo o Base de Datos como respaldo)
+    const liveSnapshot = Array.isArray(activeBotsLive) ? activeBotsLive : []
+    const liveOnline = liveSnapshot.filter(b => b.status === 'online')
+
+    // 🛠️ ¡ESTE ES EL FIX!: Si el snapshot en vivo viene vacío (común en subbots), 
+    // usamos db.getOnlineBots() para que aparezcan los 10 bots reales.
+    const fuentesDeBots = liveOnline.length > 0 ? liveOnline : (db.getOnlineBots() || [])
+
+    for (const subBot of fuentesDeBots) {
+      const subNum = obtenerNumeroLimpio(subBot.jid)
       if (!subNum || subNum === numeroMainReal) continue
       if (numerosVistos.has(subNum)) continue
       numerosVistos.add(subNum)
@@ -66,7 +65,7 @@ export default {
       const datosDb = db.getBot(`${subNum}@s.whatsapp.net`)
       const labelCandidato = (datosDb?.label && !esLabelAutomatico(datosDb.label))
         ? datosDb.label
-        : (liveBot.label && !esLabelAutomatico(liveBot.label) ? liveBot.label : config.botName)
+        : (subBot.label && !esLabelAutomatico(subBot.label) ? subBot.label : config.botName)
 
       listaFiltrada.push({
         label: labelCandidato,
