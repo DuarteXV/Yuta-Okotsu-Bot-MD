@@ -1,9 +1,11 @@
 import { db } from '../../database/db.js'
 import config from '../../config.js'
+import fs from 'fs'
+import path from 'path'
 
 export default {
   name: ['bots', 'listbots'],
-  description: 'Muestra los bots conectados y su tiempo de actividad.',
+  description: 'Muestra la lista de bots realmente conectados con tiempo de actividad blindado.',
   category: 'sockets',
   ownerOnly: false,
 
@@ -18,13 +20,11 @@ export default {
     const esLabelAutomatico = (label) =>
       label?.startsWith('SUB_') || label === 'Subbot' || label === 'MAIN'
 
-    // Función auxiliar para formatear el tiempo transcurrido
+    // Formateador dinámico de tiempo transcurrido
     const calcularTiempoActivo = (uptimeTimestamp) => {
-      if (!uptimeTimestamp) return 'Desconocido'
-      
+      if (!uptimeTimestamp) return null
       const ahora = Date.now()
       const diferencia = ahora - new Date(uptimeTimestamp).getTime()
-      
       if (diferencia < 0) return 'Recién conectado'
 
       const minutos = Math.floor((diferencia / (1000 * 60)) % 60)
@@ -35,8 +35,7 @@ export default {
       if (dias > 0) tiempoStr += `${dias}d `
       if (horas > 0 || dias > 0) tiempoStr += `${horas}h `
       tiempoStr += `${minutos}m`
-      
-      return tiempoStr
+      return tiempoStr || '1m'
     }
 
     const todosLosBots = db.getAllBots ? db.getAllBots() : []
@@ -54,22 +53,23 @@ export default {
     let listaFiltrada = []
     const numerosVistos = new Set()
 
-    // 1. Bot Principal
+    // 1. Añadir Bot Principal
     if (numeroMainReal) {
       const datosMain = db.getBot(`${numeroMainReal}@s.whatsapp.net`) || db.getBot('main')
       const nombreMain = esLabelAutomatico(datosMain?.label) ? config.botName : (datosMain?.label || config.botName)
+      
+      const uptimeMain = global.botStartTime ? calcularTiempoActivo(global.botStartTime) : 'Activo'
 
       listaFiltrada.push({
         label: nombreMain,
         jid: numeroMainReal,
         isMain: true,
-        uptime: global.botStartTime ? calcularTiempoActivo(global.botStartTime) : 'Activo'
+        uptime: uptimeMain
       })
-
       numerosVistos.add(numeroMainReal)
     }
 
-    // 2. Subbots en línea
+    // 2. Resolver Subbots en línea desde Snapshot y DB
     const liveSnapshot = Array.isArray(activeBotsLive) ? activeBotsLive : []
     const liveOnline = liveSnapshot.filter(b => b.status === 'online')
     const fuentesDeBots = liveOnline.length > 0 ? liveOnline : (db.getOnlineBots() || [])
@@ -85,20 +85,35 @@ export default {
         ? datosDb.label
         : (subBot.label && !esLabelAutomatico(subBot.label) ? subBot.label : config.botName)
 
-      // Extraemos el tiempo de actividad guardado en el objeto del bot (en DB o memoria)
-      const uptimeRaw = subBot.connectedAt || subBot.uptime || datosDb?.connectedAt || null
+      // 🛠️ ESTRATEGIA DE TIEMPO BLINDADA:
+      // Buscamos en el subbot en vivo -> En la DB -> Y si todo falla, leemos la carpeta de sesión del sistema operativo.
+      let uptimeRaw = subBot.connectedAt || subBot.uptime || datosDb?.connectedAt || null
+      
+      if (!uptimeRaw && subBot.id) {
+        const folderPath = path.resolve(`./sessions/subbots/${subBot.id}`)
+        if (fs.existsSync(folderPath)) {
+          try {
+            const stats = fs.statSync(folderPath)
+            uptimeRaw = stats.mtimeMs // Fecha de última modificación/conexión del archivo de sesión
+          } catch {
+            uptimeRaw = null
+          }
+        }
+      }
+
+      const tiempoCalculado = calcularTiempoActivo(uptimeRaw) || 'Conectado'
 
       listaFiltrada.push({
         label: labelCandidato,
         jid: subNum,
         isMain: false,
-        uptime: calcularTiempoActivo(uptimeRaw)
+        uptime: tiempoCalculado
       })
     }
 
     const nombreBotEncabezado = listaFiltrada[0]?.label || config.botName
 
-    // 3. Construcción del mensaje final
+    // 3. Renderizar Mensaje
     let text = `✨ ═══ 🫧 *${nombreBotEncabezado.toUpperCase()}* 🫧 ═══ ✨\n`
     text += `🤖 _Lista de conexiones y tiempo de actividad_\n\n`
 
