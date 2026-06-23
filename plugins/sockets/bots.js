@@ -3,7 +3,7 @@ import config from '../../config.js'
 
 export default {
   name: ['bots', 'listbots'],
-  description: 'Muestra la lista de bots realmente conectados ahora mismo',
+  description: 'Muestra los bots conectados y su tiempo de actividad.',
   category: 'sockets',
   ownerOnly: false,
 
@@ -18,7 +18,27 @@ export default {
     const esLabelAutomatico = (label) =>
       label?.startsWith('SUB_') || label === 'Subbot' || label === 'MAIN'
 
-    // 1. Determinar el número del verdadero Bot Principal
+    // Función auxiliar para formatear el tiempo transcurrido
+    const calcularTiempoActivo = (uptimeTimestamp) => {
+      if (!uptimeTimestamp) return 'Desconocido'
+      
+      const ahora = Date.now()
+      const diferencia = ahora - new Date(uptimeTimestamp).getTime()
+      
+      if (diferencia < 0) return 'Recién conectado'
+
+      const minutos = Math.floor((diferencia / (1000 * 60)) % 60)
+      const horas = Math.floor((diferencia / (1000 * 60 * 60)) % 24)
+      const dias = Math.floor(diferencia / (1000 * 60 * 60 * 24))
+
+      let tiempoStr = ''
+      if (dias > 0) tiempoStr += `${dias}d `
+      if (horas > 0 || dias > 0) tiempoStr += `${horas}h `
+      tiempoStr += `${minutos}m`
+      
+      return tiempoStr
+    }
+
     const todosLosBots = db.getAllBots ? db.getAllBots() : []
     let numeroMainReal = null
 
@@ -34,7 +54,7 @@ export default {
     let listaFiltrada = []
     const numerosVistos = new Set()
 
-    // 2. Insertar SIEMPRE al Bot Principal real en el puesto #1
+    // 1. Bot Principal
     if (numeroMainReal) {
       const datosMain = db.getBot(`${numeroMainReal}@s.whatsapp.net`) || db.getBot('main')
       const nombreMain = esLabelAutomatico(datosMain?.label) ? config.botName : (datosMain?.label || config.botName)
@@ -42,18 +62,16 @@ export default {
       listaFiltrada.push({
         label: nombreMain,
         jid: numeroMainReal,
-        isMain: true
+        isMain: true,
+        uptime: global.botStartTime ? calcularTiempoActivo(global.botStartTime) : 'Activo'
       })
 
       numerosVistos.add(numeroMainReal)
     }
 
-    // 3. Obtener la lista de subbots (Snapshot en vivo o Base de Datos como respaldo)
+    // 2. Subbots en línea
     const liveSnapshot = Array.isArray(activeBotsLive) ? activeBotsLive : []
     const liveOnline = liveSnapshot.filter(b => b.status === 'online')
-
-    // 🛠️ ¡ESTE ES EL FIX!: Si el snapshot en vivo viene vacío (común en subbots), 
-    // usamos db.getOnlineBots() para que aparezcan los 10 bots reales.
     const fuentesDeBots = liveOnline.length > 0 ? liveOnline : (db.getOnlineBots() || [])
 
     for (const subBot of fuentesDeBots) {
@@ -67,25 +85,30 @@ export default {
         ? datosDb.label
         : (subBot.label && !esLabelAutomatico(subBot.label) ? subBot.label : config.botName)
 
+      // Extraemos el tiempo de actividad guardado en el objeto del bot (en DB o memoria)
+      const uptimeRaw = subBot.connectedAt || subBot.uptime || datosDb?.connectedAt || null
+
       listaFiltrada.push({
         label: labelCandidato,
         jid: subNum,
-        isMain: false
+        isMain: false,
+        uptime: calcularTiempoActivo(uptimeRaw)
       })
     }
 
     const nombreBotEncabezado = listaFiltrada[0]?.label || config.botName
 
-    // 4. Construcción del mensaje final
+    // 3. Construcción del mensaje final
     let text = `✨ ═══ 🫧 *${nombreBotEncabezado.toUpperCase()}* 🫧 ═══ ✨\n`
-    text += `🤖 _Bots conectados al sistema_\n\n`
+    text += `🤖 _Lista de conexiones y tiempo de actividad_\n\n`
 
     let i = 1
     for (const bot of listaFiltrada) {
       const tipo = bot.isMain ? '👑 *PRINCIPAL*' : '🤖 Subbot'
       text += `🟢 *${i}. ${bot.label}*\n`
       text += `   ✦ Tipo: ${tipo}\n`
-      text += `   ✦ Número: ${bot.jid}\n\n`
+      text += `   ✦ Número: +${bot.jid}\n`
+      text += `   ✦ Activo hace: \`${bot.uptime}\`\n\n`
       i++
     }
 
