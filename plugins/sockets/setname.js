@@ -2,7 +2,7 @@ import { db } from '../../database/db.js'
 
 export default {
   name: ['setname', 'cambiarnombre'],
-  description: 'Cambia el nombre/label de un subbot específico',
+  description: 'Cambia el nombre/label de un bot (principal o subbot)',
   category: 'owner',
   ownerOnly: false,
 
@@ -30,7 +30,7 @@ export default {
       if (esOwnerGlobal) {
         const mentioned = quotedContext?.mentionedJid || []
         const targetRaw = quotedContext?.participant || mentioned[0]
-        
+
         if (targetRaw) {
           targetBotJid = cleanJid(targetRaw)
         } else {
@@ -40,22 +40,16 @@ export default {
         targetBotJid = currentBotJid
       }
 
-      // Limpieza estricta: Remueve menciones como @591xxxx del texto final para evitar duplicados visuales
       let nuevoNombre = textoBruto.replace(/@\d+/g, '').trim()
 
       if (!nuevoNombre || nuevoNombre === '') {
         return await reply({ text: '⚠️ Especifica el nuevo nombre para el bot (solo texto limpio).' })
       }
 
-      const mainBotJid = cleanJid(sock.user?.id) 
-      const esSubbotTarget = db.getAllBots().some(b => cleanJid(b.jid) === targetBotJid)
+      const esBotRegistrado = db.getAllBots().some(b => cleanJid(b.jid) === targetBotJid)
 
-      if (esOwnerGlobal && targetBotJid === mainBotJid && !esSubbotTarget) {
-        return await reply({ text: '❌ Este comando está restringido solo para subbots. No puedes cambiar el nombre del bot principal desde aquí.' })
-      }
-
-      if (esOwnerGlobal && !esSubbotTarget && targetBotJid !== currentBotJid) {
-        return await reply({ text: '❌ El usuario seleccionado no está registrado como un subbot activo en la base de datos.' })
+      if (esOwnerGlobal && !esBotRegistrado && targetBotJid !== currentBotJid) {
+        return await reply({ text: '❌ El usuario seleccionado no está registrado como un bot (principal o subbot) en la base de datos.' })
       }
 
       db.setBot(targetBotJid, { label: nuevoNombre })
