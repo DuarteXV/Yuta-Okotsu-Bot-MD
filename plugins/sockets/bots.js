@@ -5,7 +5,7 @@ import path from 'path'
 
 export default {
   name: ['bots', 'listbots'],
-  description: 'Muestra los bots con el tiempo exacto que llevan conectados.',
+  description: 'Muestra los bots con datos reales extraídos directamente de SQLite.',
   category: 'sockets',
   ownerOnly: false,
 
@@ -37,25 +37,39 @@ export default {
       return tiempoStr || '1m'
     }
 
-    const todosLosBots = db.getAllBots ? db.getAllBots() : []
-    let numeroMainReal = null
+    // 1. OBTENER TODOS LOS BOTS DESDE SQLITE
+    // Intentamos usar el método del wrapper o una consulta directa si expone el objeto driver
+    let todosLosBots = []
+    try {
+      if (typeof db.getAllBots === 'function') {
+        todosLosBots = db.getAllBots()
+      } else if (db.client && typeof db.client.prepare === 'function') {
+        // Fallback si usas un driver directo como better-sqlite3
+        todosLosBots = db.client.prepare('SELECT * FROM bots').all()
+      } else if (global.db?.data?.bots) {
+        todosLosBots = Object.values(global.db.data.bots)
+      }
+    } catch (e) {
+      console.error('Error al leer tabla SQLite:', e)
+    }
 
+    let numeroMainReal = null
     if (mainBotNum) {
       numeroMainReal = mainBotNum
     } else if (global.mainBotNum) {
       numeroMainReal = global.mainBotNum
     } else {
-      const registroMain = todosLosBots.find(b => b.isMain === true || b.isMain === 1)
-      numeroMainReal = registroMain ? obtenerNumeroLimpio(registroMain.jid) : obtenerNumeroLimpio(sock.user?.id)
+      const registroMain = todosLosBots.find(b => b.isMain === true || b.isMain === 1 || b.id === 'main')
+      numeroMainReal = registroMain ? obtenerNumeroLimpio(registroMain.jid || registroMain.id) : obtenerNumeroLimpio(sock.user?.id)
     }
 
     let listaFiltrada = []
     const numerosVistos = new Set()
 
-    // 1. Bot Principal
+    // 2. Insertar Bot Principal usando datos de SQLite
     if (numeroMainReal) {
-      const datosMain = db.getBot(`${numeroMainReal}@s.whatsapp.net`) || db.getBot('main')
-      const nombreMain = esLabelAutomatico(datosMain?.label) ? config.botName : datosMain.label
+      const datosMain = todosLosBots.find(b => obtenerNumeroLimpio(b.jid || b.id) === numeroMainReal || b.id === 'main')
+      const nombreMain = esLabelAutomatico(datosMain?.label || datosMain?.name) ? config.botName : (datosMain?.label || datosMain?.name)
       
       if (!global.botStartTime) global.botStartTime = Date.now()
       const uptimeMain = calcularTiempoActivo(global.botStartTime)
@@ -69,7 +83,7 @@ export default {
       numerosVistos.add(numeroMainReal)
     }
 
-    // Convertir el snapshot live en un Map para búsquedas rápidas por número
+    // Mapeo del snapshot en vivo (Memoria RAM del Manager)
     const liveSnapshot = Array.isArray(activeBotsLive) ? activeBotsLive : []
     const liveMap = new Map()
     for (const b of liveSnapshot) {
@@ -77,7 +91,7 @@ export default {
       if (num) liveMap.set(num, b)
     }
 
-    // 2. Escaneo de carpetas físicas
+    // 3. ESCANEO DE CARPETAS DE SUBBOTS CRUZADO CON SQLITE
     const SUBBOTS_DIR = './sessions/subbots'
     if (fs.existsSync(SUBBOTS_DIR)) {
       const carpetasSesion = fs.readdirSync(SUBBOTS_DIR, { withFileTypes: true })
@@ -90,26 +104,29 @@ export default {
         if (!subNum || subNum === numeroMainReal) continue
         if (numerosVistos.has(subNum)) continue
 
-        let datosDb = db.getBot(`${subNum}@s.whatsapp.net`) || db.getBot(idCarpeta)
-        if (!datosDb) {
-          datosDb = todosLosBots.find(b => b.jid && obtenerNumeroLimpio(b.jid) === subNum)
-        }
+        // 🔍 Búsqueda exacta en el array extraído de la tabla de SQLite
+        const datosDb = todosLosBots.find(b => {
+          const idLimpio = obtenerNumeroLimpio(b.id || b.jid)
+          return idLimpio === subNum || b.id === idCarpeta
+        })
 
+        // Obtener el nombre personalizado real guardado en la base de datos
         const labelCandidato = (datosDb?.label && !esLabelAutomatico(datosDb.label))
           ? datosDb.label
-          : idCarpeta.toUpperCase()
+          : (datosDb?.name && !esLabelAutomatico(datosDb.name) ? datosDb.name : idCarpeta.toUpperCase())
 
-        // 🔍 AQUÍ CAMBIA LA PRIORIDAD:
-        // Primero buscamos el 'connectedAt' que el Manager tiene en memoria viva (Snapshot)
+        // Obtener la marca de tiempo de conexión real
         const botEnVivo = liveMap.get(subNum)
-        let uptimeRaw = botEnVivo?.connectedAt || datosDb?.connectedAt || null
+        // SQLite suele guardar los timestamps como números enteros o texto ISO. 
+        // Validamos dinámicamente qué formato viene desde tu tabla (connected_at / connectedAt)
+        let uptimeRaw = botEnVivo?.connectedAt || datosDb?.connectedAt || datosDb?.connected_at || null
         
-        // Si no hay registro en memoria (ej. tras un reinicio general), usamos el disco como plan B
+        // Si SQLite no tenía el registro de tiempo por un reinicio, leemos el archivo físico interno
         if (!uptimeRaw) {
           try {
-            const credsFile = path.join(SUBBOTS_DIR, idCarpeta, 'creds.json')
-            if (fs.existsSync(credsFile)) {
-              uptimeRaw = fs.statSync(credsFile).birthtimeMs // Fecha de creación del archivo de conexión actual
+            const rutaCredsJson = path.join(SUBBOTS_DIR, idCarpeta, 'creds.json')
+            if (fs.existsSync(rutaCredsJson)) {
+              uptimeRaw = fs.statSync(rutaCredsJson).birthtimeMs
             }
           } catch (_) {}
         }
@@ -125,7 +142,7 @@ export default {
       }
     }
 
-    // 3. Renderizar Mensaje
+    // 4. Construcción del Mensaje
     const nombreBotEncabezado = listaFiltrada[0]?.label || config.botName
 
     let text = `✨ ═══ 🫧 *${nombreBotEncabezado.toUpperCase()}* 🫧 ═══ ✨\n`
