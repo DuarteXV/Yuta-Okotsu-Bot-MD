@@ -18,7 +18,7 @@ export default {
 
       const obtenerNombre = (numero) => {
         try {
-          const bot = db.getBot(numero)
+          const bot = db.getBot(`${numero}@s.whatsapp.net`)
 
           if (
             bot?.label &&
@@ -35,6 +35,8 @@ export default {
         }
       }
 
+      const nombrePrincipal = obtenerNombre(numeroPrincipal)
+
       const subbotsDir = './sessions/subbots'
 
       let subbots = []
@@ -48,11 +50,11 @@ export default {
           .map(name => name.replace('sub_', ''))
       }
 
-      let text = `✨ ═══ 🫧 *${config.botName.toUpperCase()}* 🫧 ═══ ✨\n`
+      let text = `✨ ═══ 🫧 *${nombrePrincipal.toUpperCase()}* 🫧 ═══ ✨\n`
       text += `🤖 _Bots conectados actualmente_\n\n`
 
       text += `👑 *BOT PRINCIPAL*\n`
-      text += `   ✦ Nombre: ${config.botName}\n`
+      text += `   ✦ Nombre: ${nombrePrincipal}\n`
       text += `   ✦ Número: +${numeroPrincipal}\n\n`
 
       text += `━━━━━━━━━━━━━━\n\n`
