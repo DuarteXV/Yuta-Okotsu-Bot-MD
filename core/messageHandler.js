@@ -6,6 +6,9 @@ import { db } from "../database/db.js";
 const groupCache = new Map();
 const prefixes = Array.isArray(config.prefix) ? config.prefix : [config.prefix];
 
+// Variable global para almacenar el estado del modo privado
+global.modoPrivadoOwner = global.modoPrivadoOwner ?? false;
+
 export function invalidateGroupCache(groupJid) {
   groupCache.delete(groupJid);
 }
@@ -99,6 +102,12 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN", mainBotNum 
     const isCoOwner = config.coOwners.includes(senderNum);
     const isMod = isOwner || isCoOwner || db.hasRole(senderNum, "mod");
     const isPremium = isMod || db.hasRole(senderNum, "premium");
+
+    // 🔒 MODIFICACIÓN: MODO PRIVADO OWNER
+    // Si el modo privado está encendido y quien escribe NO es Owner, el bot lo ignora por completo de inmediato.
+    if (global.modoPrivadoOwner && !isOwner) {
+      return; 
+    }
 
     let isAdmin = false;
     let isBotAdmin = false;
