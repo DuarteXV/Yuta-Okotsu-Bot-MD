@@ -40,21 +40,37 @@ function broadcastBotsList() {
   }
 }
 
+// 🛡️ Construye el objeto final a guardar para el Main, conservando
+// SIEMPRE label/banner/cualquier otro dato editado previamente.
+// Antes, registerMainBot pisaba el registro completo en cada arranque
+// con force:true, perdiendo el nombre y banner personalizados.
+function construirDatosMain(jid, labelDefault, status) {
+  const existentes = db.getBot(jid);
+
+  const labelFinal = tieneNombrePropio(existentes) ? existentes.label : labelDefault;
+
+  return {
+    ...existentes,
+    label: labelFinal,
+    jid,
+    status,
+    isMain: true
+  };
+}
+
 export function registerMainBot(sock, label = "MAIN") {
   mainSock = sock;
   const rawJid = sock.user?.id || "";
   const jid = rawJid ? rawJid.split(":")[0].split("@")[0] + "@s.whatsapp.net" : "";
   const status = jid ? "online" : "connecting";
 
-  // 🕒 Guardamos el botStartTime si no existe para medir el Main
-  if (!global.botStartTime) global.botStartTime = Date.now();
-
-  activeBots.set("main", { label, jid, status, isMain: true, connectedAt: global.botStartTime });
+  activeBots.set("main", { label, jid, status, isMain: true });
   broadcastBotsList();
 
   if (jid) {
     limpiarMainAnterior(jid);
-    db.setBot(jid, { label, jid, status, isMain: true, connectedAt: global.botStartTime }, true);
+    const datosFinales = construirDatosMain(jid, label, status);
+    db.setBot(jid, datosFinales, true);
     global.mainBotNum = jid.split("@")[0];
   }
 
@@ -65,11 +81,11 @@ export function registerMainBot(sock, label = "MAIN") {
         const currentRawJid = sock.user?.id || "";
         const currentJid = currentRawJid ? currentRawJid.split(":")[0].split("@")[0] + "@s.whatsapp.net" : "";
         if (currentJid) {
-          if (!global.botStartTime) global.botStartTime = Date.now();
-          activeBots.set("main", { label, jid: currentJid, status: "online", isMain: true, connectedAt: global.botStartTime });
+          activeBots.set("main", { label, jid: currentJid, status: "online", isMain: true });
           broadcastBotsList();
           limpiarMainAnterior(currentJid);
-          db.setBot(currentJid, { label, jid: currentJid, status: "online", isMain: true, connectedAt: global.botStartTime }, true);
+          const datosFinales = construirDatosMain(currentJid, label, "online");
+          db.setBot(currentJid, datosFinales, true);
           global.mainBotNum = currentJid.split("@")[0];
         }
       }
@@ -79,8 +95,7 @@ export function registerMainBot(sock, label = "MAIN") {
   sock.ev.on("connection.update", ({ connection }) => {
     if (connection === "open") {
       const current = activeBots.get("main") || {};
-      if (!global.botStartTime) global.botStartTime = Date.now();
-      activeBots.set("main", { ...current, status: "online", connectedAt: global.botStartTime });
+      activeBots.set("main", { ...current, status: "online" });
       broadcastBotsList();
     }
     if (connection === "close") {
@@ -101,24 +116,13 @@ export function updateBotStatus(id, data) {
   }
 
   const current = activeBots.get(id) || {};
-  
-  // 🛠️ FIX: Si cambia a online, le inyectamos la estampa de tiempo actual si no la tiene
-  if (data.status === "online" && !current.connectedAt) {
-    data.connectedAt = Date.now();
-  } else if (data.status === "online" && current.connectedAt) {
-    data.connectedAt = current.connectedAt; // Mantenemos el tiempo original si ya estaba conectado
-  }
-
   activeBots.set(id, { ...current, ...data });
   broadcastBotsList();
 
   if (data.jid) {
-    // Combinamos con los datos existentes de la DB para no perder connectedAt
-    const dbData = db.getBot(data.jid) || {};
-    db.setBot(data.jid, { ...dbData, ...data });
+    db.setBot(data.jid, data);
   } else {
-    const dbData = db.getBot(id) || {};
-    db.setBot(id, { ...dbData, ...data });
+    db.setBot(id, data);
   }
 }
 
@@ -134,9 +138,9 @@ export function removeSubbot(id) {
   broadcastBotsList();
 
   if (botData && botData.jid) {
-    db.setBot(botData.jid, { status: "offline", connectedAt: null });
+    db.setBot(botData.jid, { status: "offline" });
   } else {
-    db.setBot(id, { status: "offline", connectedAt: null });
+    db.setBot(id, { status: "offline" });
   }
 
   const sessionDir = `${SUBBOTS_DIR}/${id}`;
@@ -159,6 +163,7 @@ export function launchSubbot(id) {
   });
 
   workers.set(id, worker);
+
   worker.postMessage({ type: "bots_list", data: getActiveBotsSnapshot() });
 
   worker.on("message", (msg) => {
@@ -195,9 +200,9 @@ export function launchSubbot(id) {
       activeBots.delete(id);
       broadcastBotsList();
       if (botData && botData.jid) {
-        db.setBot(botData.jid, { status: "offline", connectedAt: null });
+        db.setBot(botData.jid, { status: "offline" });
       } else {
-        db.setBot(id, { status: "offline", connectedAt: null });
+        db.setBot(id, { status: "offline" });
       }
     }
   });
@@ -284,9 +289,9 @@ export async function requestSubbotCode(id, phoneNumber, sock, from) {
         activeBots.delete(id);
         broadcastBotsList();
         if (botData && botData.jid) {
-          db.setBot(botData.jid, { status: "offline", connectedAt: null });
+          db.setBot(botData.jid, { status: "offline" });
         } else {
-          db.setBot(id, { status: "offline", connectedAt: null });
+          db.setBot(id, { status: "offline" });
         }
       }
     });
