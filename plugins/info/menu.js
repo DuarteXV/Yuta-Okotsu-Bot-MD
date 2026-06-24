@@ -38,6 +38,28 @@ const catIcons = {
   "sockets":  "🛰️",
 }
 
+const catNombres = {
+  "info":     "INFO",
+  "misc":     "MISC",
+  "dl":       "DL",
+  "grupos":   "GROUP",
+  "owner":    "OWNER",
+  "utils":    "UTILS",
+  "stickers": "STICKERS",
+  "sockets":  "SOCKETS",
+}
+
+const catDescripciones = {
+  "info":     "ᶜᵒᵐᵃⁿᵈᵒˢ ᵈᵉ ⁱⁿᶠᵒʳᵐᵃᶜⁱᵒⁿ·",
+  "misc":     "ᶜᵒᵐᵃⁿᵈᵒˢ ᵐⁱˢᶜ·",
+  "dl":       "ᶜᵒᵐᵃⁿᵈᵒˢ ᵈᵉ ᵈᵉˢᶜᵃʳᵍᵃˢ·",
+  "grupos":   "ᶜᵒᵐᵃⁿᵈᵒˢ ᵖᵃʳᵃ ᵍᵉˢᵗⁱᵒⁿᵃʳ ᵍʳᵘᵖᵒˢ·",
+  "owner":    "ᶜᵒᵐᵃⁿᵈᵒˢ ᵈᵉ ᵒʷⁿᵉʳ·",
+  "utils":    "ᶜᵒᵐᵃⁿᵈᵒˢ ᵘᵗⁱˡᵉˢ·",
+  "stickers": "ᶜᵒᵐᵃⁿᵈᵒˢ ᵖᵃʳᵃ ᵍᵉˢᵗⁱᵒⁿᵃʳ ˢᵗⁱᶜᵏᵉʳˢ·",
+  "sockets":  "ᶜᵒᵐᵃⁿᵈᵒˢ ᵖᵃʳᵃ ˢᵘᵇᵇᵒᵗˢ·",
+}
+
 export default {
   name: ["menu", "help", "ayuda"],
   description: "Muestra el menú del sistema.",
@@ -46,12 +68,7 @@ export default {
 
   async run({ sock, from, senderNum, isGroup, groupName, usedPrefix, msg }) {
     try {
-      const timeZone = "America/Bogota";
-      const ahora = new Date();
-
-      const horaStr = ahora.toLocaleTimeString("es-CO", { timeZone, hour12: false });
-      const fecha   = ahora.toLocaleDateString("es-CO", { timeZone });
-      const lugar   = isGroup ? groupName : "Chat Privado";
+      const lugar = isGroup ? groupName : "Chat Privado";
 
       const currentBotNum = sock.user?.id ? sock.user.id.split('@')[0].split(':')[0].replace(/\D/g, '') : '';
       const currentBotJid = currentBotNum ? `${currentBotNum}@s.whatsapp.net` : '';
@@ -61,12 +78,9 @@ export default {
       const esLabelAutomatico = botData?.label?.startsWith('SUB_') || botData?.label === 'Subbot' || botData?.label === 'MAIN'
       const nombreBot = (esLabelAutomatico || !botData?.label ? config.botName : botData.label).replace(/@\d+/g, '').trim();
 
-      const urlFoto   = botData?.banner || "https://files.evogb.win/1oU31I.jpg";
+      const urlFoto = botData?.banner || "https://files.evogb.win/1oU31I.jpg";
 
-      // 🛡️ Fuente de verdad ÚNICA: el campo isMain de la DB, sincronizado
-      // por subbotManager.js. Antes había una condición rota (!sock.isSubbot)
-      // que siempre era true (porque sock.isSubbot nunca se asigna), lo cual
-      // marcaba a TODOS los bots como "Bot Principal" sin importar la DB.
+      // 🛡️ Fuente de verdad única: isMain de la DB
       const esVerdaderoMain = botData?.isMain === true || botData?.isMain === 1;
       const tipoBot = esVerdaderoMain ? "Bot Principal" : "Subbot";
 
@@ -85,30 +99,33 @@ export default {
         categories[cat].add(names[0])
       }
 
-      let textoMenu = `╭━━━━━━━━━━━━━━━━━━○\n`;
-      textoMenu += `││◇ \`ᴛɪᴘᴏ::\` ${tipoBot}\n`;
-      textoMenu += `││◇ \`sɪsᴛᴇᴍᴀ/ᴏᴘʀ::\` Android\n`;
-      textoMenu += `││◇ \`ᴜsᴇʀ::\` @${senderNum}\n`;
-      textoMenu += `││◇ \`ᴜʀʟ::\` ${linkMatch}\n`;
-      textoMenu += `╰━━━━━━━━━━━━━━━━━━○\n\n`;
+      let textoMenu = `*𝐇𝐨𝐥𝐚!* *@${senderNum}* soy "${nombreBot}"\n`;
+      textoMenu += `╭━━━━━━━━━━━━━━━━━━\n`;
+      textoMenu += `│ 𖠌 \`ᴛɪᴘᴏ::\` ${tipoBot}\n`;
+      textoMenu += `│ 𖠌 \`sɪsᴛᴇᴍᴀ/ᴏᴘʀ::\` Android\n`;
+      textoMenu += `│ 𖠌 \`ᴜsᴇʀ::\` @${senderNum}\n`;
+      textoMenu += `│ 𖠌 \`ᴜʀʟ::\` ${linkMatch}\n`;
+      textoMenu += `╰━━━━━━━━━━━━━━━━━━\n\n`;
 
       for (const [cat, cmds] of Object.entries(categories)) {
         const categoriaLimped = cat.toLowerCase().trim();
-        const icon = catIcons[categoriaLimped] || "🎴";
-        const nombreFormateado = categoriaLimped.toUpperCase();
+        const nombreFormateado = catNombres[categoriaLimped] || categoriaLimped.toUpperCase();
+        const descripcion = catDescripciones[categoriaLimped] || "ᶜᵒᵐᵃⁿᵈᵒˢ·";
 
-        textoMenu += `╭━━━━━━━━━━━━━━━━━━━━━━━○\n`;
-        textoMenu += `█°⿻︵ׄ  SECTOR│*${nombreFormateado}* ·°.•\n`;
+        textoMenu += `𓆩◇𓆪 ⸙ SECTOR│ *${nombreFormateado}* ·°ᰍ.•\n`;
+        textoMenu += `✐꒷ ${descripcion}\n`;
 
         for (const cmd of cmds) {
-          textoMenu += `│˗ˋˏ𓍯 ꒰ 🪼 *${usedPrefix}${cmd}*\n`;
+          textoMenu += `> ⏤͟͟͞͞⊱🌀 *${usedPrefix}${cmd}*\n`;
         }
 
-        textoMenu += `╰━━━━━━━━━━━━━━━━━━━━━━━⬣\n\n`;
+        textoMenu += `\n`;
       }
 
-      textoMenu += `🪼 _Powered by DuarteXV | ${nombreBot}_\n`;
-      textoMenu += `🔗 ${linkMatch}`;
+      textoMenu += `╭━─━─━─━─━─━─━─━╮\n`;
+      textoMenu += `🪼 _powᧉꭇᧉd ɓy DuarteXV_ │\n`;
+      textoMenu += `🔗 ${linkMatch}\n`;
+      textoMenu += `╰━─━─━─━─━─━─━─━╯`;
 
       let imgBanner
       if (mediaCache && lastUsedUrl === urlFoto && Date.now() - mediaCacheTime < 3600000) {
