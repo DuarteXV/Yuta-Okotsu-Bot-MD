@@ -7,7 +7,7 @@ export default {
   description: 'Muestra los bots conectados',
   category: 'sockets',
 
-  async run({ sock, react, reply }) {
+  async run({ sock, react, reply, m }) {
     try {
       await react('🤖')
 
@@ -43,7 +43,6 @@ export default {
       const nombrePrincipal = obtenerNombre(numeroPrincipal)
 
       const subbotsDir = './sessions/subbots'
-
       let subbots = []
 
       if (fs.existsSync(subbotsDir)) {
@@ -56,40 +55,34 @@ export default {
           .filter(numero => numero !== numeroPrincipal)
       }
 
-      let text = `✨ ═══ 🫧 *${nombrePrincipal.toUpperCase()}* 🫧 ═══ ✨\n`
-      text += `🤖 _Bots conectados actualmente_\n\n`
+      // Estructura principal del diseño solicitado
+      let text = `•.°· ◇ \`ᒪIՏTᗩ ᗪᗴ ᗷOTՏ ᗩᑕTIᐯOՏ\` ◇ ·°.•\n`
+      text += `〔💎〕Principal: ${nombrePrincipal}\n`
+      text += `〔🌀〕Sub-bots: ${subbots.length}\n`
+      text += `〔🌱〕En este grupo: \n\n`
+      
+      text += `@${m.sender.split('@')[0]}\n`
 
-      text += `👑 *BOT PRINCIPAL*\n`
-      text += `   ✦ Nombre: ${nombrePrincipal}\n`
-      text += `   ✦ Número: +${numeroPrincipal}\n\n`
+      // Datos del Bot Principal (Sin la línea Online)
+      text += `> *𖠌 ʙᴏᴛ::* ${nombrePrincipal}\n`
+      text += `> *⚝ ᴛɪᴘᴏ::* Principal 👑\n\n`
 
-      text += `━━━━━━━━━━━━━━\n\n`
-
-      text += `🤖 *SUBBOTS (${subbots.length})*\n\n`
-
-      if (!subbots.length) {
-        text += `⚠️ No hay subbots conectados.\n\n`
-      } else {
-        let i = 1
-
+      // Datos de los Sub-bots si existen (Sin la línea Online)
+      if (subbots.length > 0) {
         for (const numero of subbots) {
-          const nombre = obtenerNombre(numero)
-
-          text += `🟢 *${i}. ${nombre}*\n`
-          text += `   ✦ Número: +${numero}\n\n`
-
-          i++
+          const nombreSub = obtenerNombre(numero)
+          text += `> *𖠌 ʙᴏᴛ::* ${nombreSub}\n`
+          text += `> *⚝ ᴛɪᴘᴏ::* Sub-bot 🌀\n\n`
         }
       }
 
       text += `🪼 _Powered by DuarteXV_`
 
-      await reply({ text })
+      await reply({ text, mentions: [m.sender] })
       await react('✅')
 
     } catch (e) {
       console.error(e)
-
       await react('❌')
       await reply({
         text: `❌ Error:\n${e.message}`
