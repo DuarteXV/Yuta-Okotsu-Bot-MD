@@ -6,9 +6,6 @@ import { db } from "../database/db.js";
 const groupCache = new Map();
 const prefixes = Array.isArray(config.prefix) ? config.prefix : [config.prefix];
 
-// Inicializamos la variable global del candado
-global.modoPrivadoOwner = global.modoPrivadoOwner ?? false;
-
 export function invalidateGroupCache(groupJid) {
   groupCache.delete(groupJid);
 }
@@ -38,16 +35,6 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN", mainBotNum 
 
     const sender = cleanJid(senderJid);
     const botJid = cleanJid(sock.user?.id || "");
-    const senderNum = sender.split("@")[0];
-
-    // 🛡️ DETECCIÓN DE PERMISOS PRINCIPALES
-    const isOwner = config.ownerNumber.includes(senderNum) || msg.key?.fromMe;
-
-    // 🔒 CORRECCIÓN AQUÍ: CANDADO GLOBAL DE MODO OWNER
-    // Si el modo privado está en true y no eres Owner, se corta la ejecución aquí en seco.
-    if (global.modoPrivadoOwner === true && !isOwner) {
-      return;
-    }
 
     const body =
       msg.message?.conversation ||
@@ -107,6 +94,13 @@ export async function handleMessage(sock, rawMsg, botLabel = "MAIN", mainBotNum 
       }
     }
 
+    const senderNum = sender.split("@")[0];
+
+    // 🛡️ isOwner depende ÚNICAMENTE de config.ownerNumber. El que el
+    // mensaje sea "fromMe" (el bot escribiéndose a sí mismo) ya NO otorga
+    // privilegios de owner automáticamente — si el número del bot no está
+    // explícitamente en config.ownerNumber, no es owner.
+    const isOwner = config.ownerNumber.includes(senderNum);
     const isCoOwner = config.coOwners.includes(senderNum);
     const isMod = isOwner || isCoOwner || db.hasRole(senderNum, "mod");
     const isPremium = isMod || db.hasRole(senderNum, "premium");
