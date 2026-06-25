@@ -19,7 +19,6 @@ function formatTime(seconds) {
 
 function getMemoryInfo() {
   try {
-    // Intento para Docker / Pterodactyl (cgroup v2)
     if (fs.existsSync("/sys/fs/cgroup/memory.max") && fs.existsSync("/sys/fs/cgroup/memory.current")) {
       let total = fs.readFileSync("/sys/fs/cgroup/memory.max", "utf8").trim();
       let used = fs.readFileSync("/sys/fs/cgroup/memory.current", "utf8").trim();
@@ -28,8 +27,7 @@ function getMemoryInfo() {
         return { total: Number(total), used: Number(used) };
       }
     }
-    
-    // Intento para cgroup v1
+
     if (fs.existsSync("/sys/fs/cgroup/memory/memory.limit_in_bytes")) {
       const total = fs.readFileSync("/sys/fs/cgroup/memory/memory.limit_in_bytes", "utf8").trim();
       const used = fs.readFileSync("/sys/fs/cgroup/memory/memory.usage_in_bytes", "utf8").trim();
@@ -42,7 +40,6 @@ function getMemoryInfo() {
     // Silenciar errores de lectura de archivos de sistema
   }
 
-  // Fallback seguro usando el sistema operativo nativo
   const total = os.totalmem();
   const used = total - os.freemem();
   return { total, used };
@@ -56,36 +53,41 @@ export default {
 
   async run({ sock, from, react, msg }) {
     try {
-      // Manejo seguro del emoji de carga
       if (react && typeof react === "function") {
-        await react("跑").catch(() => {});
+        await react("⏳").catch(() => {});
       } else if (sock?.sendMessage) {
-        // Fallback si react no es una función ejecutable directamente
         await sock.sendMessage(from, { react: { text: "⏳", key: msg.key } }).catch(() => {});
       }
 
       // 🤖 Obtener el JID de la sesión actual de forma segura
-      const botJid = sock?.user?.id ? (sock.user.id.split(':')[0] + '@s.whatsapp.net') : null;
-      
-      let currentBotName = "YUTA OKOTSU";
+      const currentBotNum = sock?.user?.id
+        ? sock.user.id.split('@')[0].split(':')[0].replace(/\D/g, '')
+        : null;
+      const botJid = currentBotNum ? `${currentBotNum}@s.whatsapp.net` : null;
+
+      // 🏷️ Misma regla que usan menu.js / bots.js: si el bot tiene un
+      // label personalizado (editado con .setname), se respeta; si sigue
+      // con el genérico (SUB_xxx, "Subbot", "MAIN" o sin label), se usa
+      // config.botName.
+      let currentBotName = config.botName || "YUTA OKOTSU";
       try {
         if (botJid && db && typeof db.getBot === "function") {
           const botData = db.getBot(botJid) || {};
-          if (botData.customName) {
-            currentBotName = botData.customName;
-          } else {
-            currentBotName = config.botname || config.botName || "YUTA OKOTSU";
-          }
-        } else {
-          currentBotName = config.botname || config.botName || "YUTA OKOTSU";
+          const esLabelAutomatico =
+            botData.label?.startsWith('SUB_') ||
+            botData.label === 'Subbot' ||
+            botData.label === 'MAIN';
+
+          currentBotName = (esLabelAutomatico || !botData.label)
+            ? (config.botName || "YUTA OKOTSU")
+            : botData.label;
         }
       } catch {
-        currentBotName = config.botname || config.botName || "YUTA OKOTSU";
+        currentBotName = config.botName || "YUTA OKOTSU";
       }
 
       currentBotName = currentBotName.toUpperCase();
 
-      // Obtener datos de rendimiento
       const memory = getMemoryInfo();
       const ramTotal = memory.total;
       const ramUsed = memory.used;
@@ -99,8 +101,8 @@ export default {
 
       let cpuCores = 1;
       try {
-        cpuCores = typeof os.availableParallelism === "function" 
-          ? os.availableParallelism() 
+        cpuCores = typeof os.availableParallelism === "function"
+          ? os.availableParallelism()
           : (cpus ? cpus.length : 1);
       } catch {
         cpuCores = cpus ? cpus.length : 1;
@@ -141,11 +143,11 @@ export default {
 
     } catch (error) {
       console.error("Error crítico en system:", error);
-      
+
       try {
         if (react && typeof react === "function") await react("❌").catch(() => {});
-        await sock.sendMessage(from, { 
-          text: "官 Ocurrió un error interno obteniendo el sistema." 
+        await sock.sendMessage(from, {
+          text: "官 Ocurrió un error interno obteniendo el sistema."
         }, { quoted: msg });
       } catch (e) {
         console.error("No se pudo enviar el mensaje de error:", e);
