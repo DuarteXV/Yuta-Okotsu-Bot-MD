@@ -1,5 +1,8 @@
 import axios from "axios";
 
+const API_KEY = "Duarte-zz12";
+const API_URL = "https://api.alyacore.xyz/ai/copilot";
+
 export default {
   name: ["copilot", "ai"],
   description: "Conversa con la IA Copilot.",
@@ -20,18 +23,13 @@ export default {
     });
 
     try {
-      const url = `https://fare.ink/ai/copilot?q=${encodeURIComponent(text)}&model=default`;
+      const url = `${API_URL}?text=${encodeURIComponent(text)}&key=${API_KEY}`;
 
-      const { data } = await axios.get(url, {
-        headers: {
-          "Content-Type": "application/json"
-        },
-        timeout: 60000
-      });
+      const { data } = await axios.get(url, { timeout: 60000 });
 
-      const responseText = data?.respuesta || data?.result || data?.response || data?.answer || data?.text;
+      const responseText = data?.result || data?.response || data?.answer || data?.text || data?.message;
 
-      if (!data?.status || !responseText) {
+      if (!responseText) {
         return await sock.sendMessage(from, {
           text: "❌ No se pudo obtener una respuesta de Copilot.",
           edit: sent.key
