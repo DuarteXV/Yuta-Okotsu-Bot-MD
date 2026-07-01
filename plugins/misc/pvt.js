@@ -1,41 +1,60 @@
-exports.command = {
-  name: 'pvt',
+import { downloadMediaMessage } from '@whiskeysockets/baileys'
+
+export default {
+  name: ['pvt'],
+  description: 'Convierte un video respondido en nota de video',
   category: 'misc',
-  desc: 'Convierte un video respondido en nota de video (pvt)',
-  owner: false,
-  group: true,
-  private: true,
-  run: async (conn, m, { }) => {
-    const quoted = m.quoted
-    
-    if (!quoted || quoted.mtype !== 'videoMessage') {
-      return conn.sendMessage(m.chat, { 
-        text: '❌ Responde a un video para convertirlo en nota de video.' 
-      }, { quoted: m })
+  ownerOnly: false,
+
+  async run({ sock, from, msg, react, reply }) {
+    const msgType = Object.keys(msg.message || {})[0]
+    const contextInfo = msg.message?.extendedTextMessage?.contextInfo
+    const quoted = contextInfo?.quotedMessage
+    const quotedType = quoted ? Object.keys(quoted)[0] : null
+
+    const isVideo = msgType === 'videoMessage'
+    const isQuotedVideo = quotedType === 'videoMessage'
+
+    if (!isVideo && !isQuotedVideo) {
+      return reply({ text: '❌ Responde a un video para convertirlo en nota de video (pvt).' })
     }
+
+    await react('⏳')
+
+    const targetMsg = isVideo
+      ? msg
+      : {
+          key: {
+            remoteJid: from,
+            id: contextInfo?.stanzaId,
+            participant: contextInfo?.participant
+          },
+          message: quoted
+        }
 
     let videoBuffer
     try {
-      videoBuffer = await quoted.download()
+      videoBuffer = await downloadMediaMessage(targetMsg, 'buffer', {}, { sock })
     } catch (e) {
-      return conn.sendMessage(m.chat, { 
-        text: '❌ No se pudo descargar el video.' 
-      }, { quoted: m })
+      await react('❌')
+      return reply({ text: '❌ No se pudo descargar el video.' })
     }
 
-    await conn.sendMessage(m.chat, {
+    await sock.sendMessage(from, {
       video: videoBuffer,
       mimetype: 'video/mp4',
       ptv: true,
       contextInfo: {
-        mentionedJid: [m.sender],
+        mentionedJid: [msg.key?.participant || from],
         isForwarded: true,
         forwardedNewsletterMessageInfo: {
           newsletterJid: '120363420979328566@newsletter',
-          newsletterName: '⏤͟͞ू⃪𝐁𝕃𝐔𝐄 𝐋𝕆𝐂𝕂 𝐂𝕃𝐔𝐁 𑁯🩵ᰍ',
+          newsletterName: '⏤͟͞ू⃪𝐁𝕃𝐔𝔼 𝐋𝕆𝐂𝕂 𝐂𝕃𝐔𝔹 𑁯🩵ᰍ',
           serverMessageId: -1
         }
       }
-    }, { quoted: m })
+    }, { quoted: msg })
+
+    await react('✅')
   }
 }
